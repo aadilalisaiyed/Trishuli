@@ -1,25 +1,98 @@
-// ============================================================
-// MineSafe AI — Report Service
-// ============================================================
-
+import { api } from './api';
+import { mapBackendAlertToFrontend } from './transformers';
 import type { ReportConfig, ReportData, NodeData, Alert } from '../types';
 import { format } from 'date-fns';
 
 /**
- * Generate report data from current state.
+ * Generate structured report JSON preview via backend REST API.
  */
+export async function generateReportApi(configData: ReportConfig): Promise<ReportData> {
+  const payload = {
+    mine: configData.mine,
+    date_range: {
+      start: configData.dateRange.start.toISOString(),
+      end: configData.dateRange.end.toISOString(),
+    },
+    node_scope: configData.nodeScope,
+    region: configData.region,
+    sections: configData.sections,
+  };
+
+  const response = await api.post('/reports/generate', payload);
+  const data = response.data;
+
+  return {
+    config: configData,
+    generatedAt: data.generated_at ? new Date(data.generated_at) : new Date(),
+    summary: data.summary,
+    riskOverview: {
+      overallRisk: data.risk_overview.overall_risk,
+      l0Percentage: data.risk_overview.l0_percentage,
+      l1Percentage: data.risk_overview.l1_percentage,
+      l2Percentage: data.risk_overview.l2_percentage,
+      l3Percentage: data.risk_overview.l3_percentage,
+    },
+    nodeStatistics: (data.node_statistics || []).map((s: any) => ({
+      nodeId: s.node_id,
+      avgTilt: s.avg_tilt,
+      maxDisplacement: s.max_displacement,
+      peakVibration: s.peak_vibration,
+      crackEvents: s.crack_events,
+      avgRiskScore: s.avg_risk_score,
+    })),
+    alerts: (data.alerts || []).map(mapBackendAlertToFrontend),
+    aiPredictions: (data.ai_predictions || []).map((p: any) => ({
+      nodeId: p.node_id,
+      avgPredictionAccuracy: p.avg_prediction_accuracy,
+      avgConfidence: p.avg_confidence,
+      predictedDeformation: p.predicted_deformation,
+    })),
+  };
+}
+
+/**
+ * Request downloadable CSV telemetry report stream from backend and trigger file download.
+ */
+export async function exportReportCsvApi(configData: ReportConfig): Promise<void> {
+  const payload = {
+    mine: configData.mine,
+    date_range: {
+      start: configData.dateRange.start.toISOString(),
+      end: configData.dateRange.end.toISOString(),
+    },
+    node_scope: configData.nodeScope,
+    region: configData.region,
+    sections: configData.sections,
+  };
+
+  const response = await api.post('/reports/export/csv', payload, {
+    responseType: 'blob',
+  });
+
+  const blob = new Blob([response.data], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `minesafe_report_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+// ── Client-Side Fallback / Utilities ─────────────────────────
 export function generateReport(
-  config: ReportConfig,
+  configData: ReportConfig,
   nodes: NodeData[],
   alerts: Alert[]
 ): ReportData {
-  const scopedNodes = config.nodeScope.includes('ALL')
+  const scopedNodes = configData.nodeScope.includes('ALL')
     ? nodes
-    : nodes.filter(n => config.nodeScope.includes(n.id));
+    : nodes.filter(n => configData.nodeScope.includes(n.id));
 
   const scopedAlerts = alerts.filter(a => {
-    if (!config.nodeScope.includes('ALL') && !config.nodeScope.includes(a.nodeId)) return false;
-    return a.timestamp >= config.dateRange.start && a.timestamp <= config.dateRange.end;
+    if (!configData.nodeScope.includes('ALL') && !configData.nodeScope.includes(a.nodeId)) return false;
+    return a.timestamp >= configData.dateRange.start && a.timestamp <= configData.dateRange.end;
   });
 
   const riskCounts = { L0: 0, L1: 0, L2: 0, L3: 0 };
@@ -27,9 +100,9 @@ export function generateReport(
   const total = scopedNodes.length || 1;
 
   return {
-    config,
+    config: configData,
     generatedAt: new Date(),
-    summary: `Mine subsidence monitoring report for ${config.mine} covering the period ${format(config.dateRange.start, 'dd MMM yyyy')} to ${format(config.dateRange.end, 'dd MMM yyyy')}. ${scopedNodes.length} nodes monitored with ${scopedAlerts.length} alerts recorded during this period.`,
+    summary: `Mine subsidence monitoring report for ${configData.mine} covering the period ${format(configData.dateRange.start, 'dd MMM yyyy')} to ${format(configData.dateRange.end, 'dd MMM yyyy')}. ${scopedNodes.length} nodes monitored with ${scopedAlerts.length} alerts recorded during this period.`,
     riskOverview: {
       overallRisk: scopedNodes.reduce((worst, n) => {
         const order = { L0: 0, L1: 1, L2: 2, L3: 3 };
@@ -58,13 +131,9 @@ export function generateReport(
   };
 }
 
-/**
- * Export report data as CSV string.
- */
 export function exportCSV(nodes: NodeData[], alerts: Alert[]): string {
   const lines: string[] = [];
 
-  // Node data
   lines.push('MINE SUBSIDENCE MONITORING DATA — PROTOTYPE / DEMONSTRATION DATA');
   lines.push('');
   lines.push('NODE DATA');
@@ -107,9 +176,6 @@ export function exportCSV(nodes: NodeData[], alerts: Alert[]): string {
   return lines.join('\n');
 }
 
-/**
- * Get default report sections.
- */
 export function getDefaultReportSections() {
   return [
     { id: 'executive-summary', label: 'Executive Summary', enabled: true },

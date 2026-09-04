@@ -18,20 +18,23 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const success = login(username, password);
+    try {
+      const success = await login(username, password);
       if (success) {
         navigate('/dashboard');
       } else {
-        setError('Invalid credentials. Use demo credentials shown below.');
+        setError('Invalid username or password. Please verify backend credentials.');
         setLoading(false);
       }
-    }, 400);
+    } catch {
+      setError('Authentication error. Unable to connect to MineSafe backend.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -199,7 +202,7 @@ export function LoginPage() {
                 />
                 <span className="text-xs text-secondary">Remember this session</span>
               </label>
-              <span className="text-xs text-muted">Demo Mode Active</span>
+              <span className="text-xs text-muted">Backend Integrated</span>
             </div>
 
             <button
@@ -217,7 +220,7 @@ export function LoginPage() {
             </button>
           </form>
 
-          {/* Discreet Demo Credentials Box */}
+          {/* Credentials Box */}
           <div style={{
             marginTop: 32,
             background: 'var(--bg)',
@@ -226,7 +229,7 @@ export function LoginPage() {
             padding: '12px 14px',
           }}>
             <div className="text-xs" style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
-              DEMO CREDENTIALS:
+              DEMO BACKEND CREDENTIALS:
             </div>
             <div className="text-xs text-muted" style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Username: <code>{config.auth.demoUsername}</code></span>

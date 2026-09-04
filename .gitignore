@@ -1,3 +1,9 @@
+# Environment & Secret files
+.env
+.env.*
+!.env.example
+*.local
+
 # Logs
 logs
 *.log
@@ -7,10 +13,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node / Frontend Build
 node_modules
 dist
 dist-ssr
-*.local
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.sqlite
+*.sqlite3
 
 # Editor directories and files
 .vscode/*
