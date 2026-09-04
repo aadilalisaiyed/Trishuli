@@ -1,0 +1,194 @@
+/* ============================================================
+   MineSafe AI — Report Styles
+   ============================================================ */
+
+.report-builder-card {
+  margin-bottom: var(--sp-xl);
+}
+
+.report-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-md);
+}
+
+.sections-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-sm);
+  background: var(--bg);
+  padding: 12px;
+  border-radius: var(--r-md);
+}
+
+/* Document Preview */
+.report-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.report-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.report-document {
+  background: white;
+  padding: 40px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+  max-width: 900px;
+  margin: 0 auto;
+  font-family: var(--font-sans);
+  color: #0F172A;
+}
+
+.doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.doc-logo-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary);
+  letter-spacing: -0.03em;
+}
+
+.doc-subtitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.doc-confidential {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--critical);
+  margin-top: 6px;
+  letter-spacing: 0.05em;
+}
+
+.doc-header-right {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  text-align: right;
+}
+
+.doc-divider {
+  height: 2px;
+  background: #0F172A;
+  margin: 20px 0;
+}
+
+.doc-section {
+  margin-bottom: 24px;
+}
+
+.doc-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  color: #0F172A;
+}
+
+.doc-text {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.doc-risk-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.doc-risk-card {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-risk-card .label {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.doc-risk-card .val {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  margin-top: 10px;
+}
+
+.doc-table th {
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+.doc-table td {
+  border: 1px solid #E2E8F0;
+  padding: 8px 10px;
+}
+
+.doc-list {
+  padding-left: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.8;
+  color: #334155;
+}
+
+.doc-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 48px;
+  padding-top: 20px;
+}
+
+.sig-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.sig-line {
+  width: 180px;
+  height: 1px;
+  background: #64748B;
+  margin-bottom: 8px;
+}
+
+.doc-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}

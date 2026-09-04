@@ -1,0 +1,295 @@
+/* ============================================================
+   MineSafe AI — Map Styles
+   ============================================================ */
+
+.mine-map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Custom Marker */
+.custom-leaflet-marker {
+  background: transparent;
+  border: none;
+}
+
+.custom-node-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.2s ease;
+  cursor: pointer;
+}
+
+.custom-node-marker:hover,
+.custom-node-marker.selected {
+  transform: scale(1.15) translateY(-4px);
+}
+
+.marker-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border-radius: var(--r-md);
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  min-width: 38px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+}
+
+.marker-id {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.marker-level {
+  font-size: 0.6rem;
+  font-weight: 700;
+  opacity: 0.95;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.marker-stem {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--node-color, #2563eb);
+}
+
+/* Safe Zone Marker */
+.custom-safezone-marker {
+  background: transparent;
+  border: none;
+}
+
+.safe-zone-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.safe-zone-icon {
+  background: #10B981;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid white;
+}
+
+.safe-zone-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  background: rgba(15, 23, 42, 0.85);
+  color: white;
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* Map Popups */
+.node-popup-content {
+  padding: 12px;
+  min-width: 250px;
+  font-family: var(--font-sans);
+}
+
+.popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.popup-ai-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--ai-light);
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  margin-bottom: 10px;
+}
+
+.popup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.popup-metric {
+  background: var(--bg);
+  padding: 4px 6px;
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-metric .label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.popup-metric .value {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.popup-metric .value.abnormal {
+  color: var(--critical);
+}
+
+.safezone-popup {
+  padding: 8px 10px;
+}
+
+/* Layer Control UI */
+.map-layer-control {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+}
+
+.map-layer-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.map-layer-toggle-btn:hover {
+  background: var(--card-hover);
+}
+
+.map-layer-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 260px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-panel-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+/* Map Legend */
+.map-legend-card {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  gap: 12px;
+  max-width: 90%;
+  pointer-events: auto;
+}
+
+.legend-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legend-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.legend-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.legend-box {
+  width: 14px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.legend-divider {
+  width: 1px;
+  background: var(--border);
+}
+
+@media (max-width: 768px) {
+  .map-legend-card {
+    flex-direction: column;
+    gap: 6px;
+    bottom: 8px;
+    left: 8px;
+    padding: 6px 8px;
+  }
+}
