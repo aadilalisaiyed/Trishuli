@@ -1,15 +1,17 @@
 // ============================================================
-// MineSafe AI — Application Context
+// MineSafe AI — Application Context & Real-Time Engine
 // ============================================================
-// Central state management for auth, nodes, alerts, simulation.
+// Central state management powered by REST APIs & WebSockets.
 
-import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { NodeData, Alert, DemoScenario, Notification, User, SystemStatus } from '../types';
-import { initializeNodes, simulateTick, getSystemStatus } from '../services/simulationEngine';
-import { generateSeedAlerts, createAlert, acknowledgeAlert as ackAlert, resolveAlert as resAlert } from '../services/alertService';
 import { config } from '../config';
+import { loginApi, logoutApi, getCurrentUserApi } from '../services/authService';
+import { fetchMineNodesApi } from '../services/nodesService';
+import { fetchAlertsApi, acknowledgeAlertApi, resolveAlertApi } from '../services/alertService';
+import { mapBackendNodeToFrontend, mapBackendAlertToFrontend } from '../services/transformers';
 
-// --- State ---
+// --- State Interface ---
 interface AppState {
   user: User | null;
   nodes: NodeData[];
@@ -32,7 +34,7 @@ const initialState: AppState = {
   isLoading: true,
 };
 
-// --- Actions ---
+// --- Action Types ---
 type Action =
   | { type: 'LOGIN'; user: User }
   | { type: 'LOGOUT' }
@@ -48,6 +50,13 @@ type Action =
   | { type: 'TICK'; nodes: NodeData[] }
   | { type: 'SET_LOADING'; loading: boolean };
 
+function getSystemStatusFromNodes(nodes: NodeData[]): SystemStatus {
+  if (nodes.some(n => n.riskLevel === 'L3')) return 'CRITICAL';
+  if (nodes.some(n => n.riskLevel === 'L2')) return 'WARNING';
+  if (nodes.some(n => n.status === 'Offline')) return 'DEGRADED';
+  return 'OPERATIONAL';
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'LOGIN':
@@ -55,7 +64,13 @@ function reducer(state: AppState, action: Action): AppState {
     case 'LOGOUT':
       return { ...initialState, user: null, isLoading: false };
     case 'SET_NODES':
-      return { ...state, nodes: action.nodes, isLoading: false };
+      return {
+        ...state,
+        nodes: action.nodes,
+        systemStatus: getSystemStatusFromNodes(action.nodes),
+        isLoading: false,
+        lastUpdate: new Date(),
+      };
     case 'SET_ALERTS':
       return { ...state, alerts: action.alerts };
     case 'ADD_ALERT': {
@@ -64,7 +79,7 @@ function reducer(state: AppState, action: Action): AppState {
       const newNotification: Notification = {
         id: `notif-${Date.now()}`,
         type: notifType,
-        title: `${action.alert.severity} Alert — ${action.alert.nodeId}`,
+        title: `${action.alert.severity} Alert — Node ${action.alert.nodeId}`,
         message: action.alert.trigger,
         timestamp: new Date(),
         read: false,
@@ -81,14 +96,18 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         alerts: state.alerts.map(a =>
-          a.id === action.alertId ? ackAlert(a) : a
+          a.id === action.alertId
+            ? { ...a, status: 'ACKNOWLEDGED', acknowledgedAt: new Date() }
+            : a
         ),
       };
     case 'RESOLVE_ALERT':
       return {
         ...state,
         alerts: state.alerts.map(a =>
-          a.id === action.alertId ? resAlert(a) : a
+          a.id === action.alertId
+            ? { ...a, status: 'RESOLVED', resolvedAt: new Date() }
+            : a
         ),
       };
     case 'SET_SCENARIO':
@@ -111,7 +130,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         nodes: action.nodes,
-        systemStatus: getSystemStatus(action.nodes),
+        systemStatus: getSystemStatusFromNodes(action.nodes),
         lastUpdate: new Date(),
       };
     case 'SET_LOADING':
@@ -121,110 +140,132 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-// --- Context ---
+// --- Context Definition ---
 interface AppContextValue {
   state: AppState;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   setScenario: (scenario: DemoScenario) => void;
-  acknowledgeAlert: (alertId: string) => void;
-  resolveAlert: (alertId: string) => void;
+  acknowledgeAlert: (alertId: string) => Promise<void>;
+  resolveAlert: (alertId: string) => Promise<void>;
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
+  reloadMineData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const scenarioRef = useRef<DemoScenario>(state.scenario);
-  const nodesRef = useRef<NodeData[]>(state.nodes);
-  const prevRiskLevelsRef = useRef<Record<string, string>>({});
 
-  // Keep refs in sync
-  useEffect(() => {
-    scenarioRef.current = state.scenario;
-  }, [state.scenario]);
-
-  useEffect(() => {
-    nodesRef.current = state.nodes;
-  }, [state.nodes]);
-
-  // Check auth on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(config.auth.sessionKey);
-    if (stored) {
-      try {
-        const user = JSON.parse(stored);
-        dispatch({ type: 'LOGIN', user });
-      } catch { /* ignore */ }
+  // Helper to load current nodes and alerts from REST backend
+  const reloadMineData = useCallback(async () => {
+    try {
+      dispatch({ type: 'SET_LOADING', loading: true });
+      const [nodes, alerts] = await Promise.all([
+        fetchMineNodesApi(config.mine.id),
+        fetchAlertsApi(),
+      ]);
+      dispatch({ type: 'SET_NODES', nodes });
+      dispatch({ type: 'SET_ALERTS', alerts });
+    } catch (err) {
+      console.error('[REST Error] Failed to fetch mine data:', err);
+    } finally {
+      dispatch({ type: 'SET_LOADING', loading: false });
     }
-
-    // Initialize nodes and alerts
-    const nodes = initializeNodes();
-    dispatch({ type: 'SET_NODES', nodes });
-    dispatch({ type: 'SET_ALERTS', alerts: generateSeedAlerts() });
-
-    // Store initial risk levels
-    nodes.forEach(n => {
-      prevRiskLevelsRef.current[n.id] = n.riskLevel;
-    });
   }, []);
 
-  // Simulation loop
+  // 1. Check user auth & initial load on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('minesafe_access_token');
+      if (token) {
+        try {
+          const user = await getCurrentUserApi();
+          dispatch({ type: 'LOGIN', user });
+          await reloadMineData();
+        } catch {
+          localStorage.removeItem('minesafe_access_token');
+          localStorage.removeItem(config.auth.sessionKey);
+          dispatch({ type: 'SET_LOADING', loading: false });
+        }
+      } else {
+        dispatch({ type: 'SET_LOADING', loading: false });
+      }
+    };
+
+    initAuth();
+  }, [reloadMineData]);
+
+  // 2. Real-Time WebSocket Telemetry Broadcast Engine
   useEffect(() => {
     if (!state.user) return;
 
-    const interval = setInterval(() => {
-      const currentNodes = nodesRef.current;
-      if (currentNodes.length === 0) return;
+    const wsBase = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000/api/v1/ws';
+    const wsUrl = `${wsBase}/mines/${config.mine.id}/live`;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: any = null;
 
-      const updated = simulateTick(currentNodes, scenarioRef.current);
-      dispatch({ type: 'TICK', nodes: updated });
+    const connect = () => {
+      socket = new WebSocket(wsUrl);
 
-      // Generate alerts on risk level changes
-      updated.forEach(node => {
-        const prevLevel = prevRiskLevelsRef.current[node.id];
-        if (node.riskLevel !== prevLevel && node.riskLevel !== 'L0') {
-          const riskOrder = { L0: 0, L1: 1, L2: 2, L3: 3 };
-          if (riskOrder[node.riskLevel] > riskOrder[prevLevel as keyof typeof riskOrder]) {
-            const alert = createAlert(node);
-            if (alert) {
-              dispatch({ type: 'ADD_ALERT', alert });
-            }
+      socket.onopen = () => {
+        console.log('[WebSocket Connected] Real-time stream active:', wsUrl);
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'NODE_TICK' && Array.isArray(data.payload?.nodes)) {
+            const updatedNodes = data.payload.nodes.map(mapBackendNodeToFrontend);
+            dispatch({ type: 'TICK', nodes: updatedNodes });
+          } else if (data.type === 'NEW_ALERT' && data.payload?.alert) {
+            const newAlert = mapBackendAlertToFrontend(data.payload.alert);
+            dispatch({ type: 'ADD_ALERT', alert: newAlert });
           }
+        } catch (err) {
+          console.error('[WebSocket Message Error]', err);
         }
-        prevRiskLevelsRef.current[node.id] = node.riskLevel;
-      });
-    }, config.simulation.updateInterval);
+      };
 
-    return () => clearInterval(interval);
+      socket.onerror = (err) => {
+        console.warn('[WebSocket Stream Warning]', err);
+      };
+
+      socket.onclose = () => {
+        console.warn('[WebSocket Disconnected] Reconnecting in 3 seconds...');
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+      }
+    };
   }, [state.user]);
 
-  const login = useCallback((username: string, password: string): boolean => {
-    if (username === config.auth.demoUsername && password === config.auth.demoPassword) {
-      const user: User = {
-        id: '1',
-        username,
-        role: 'Safety Officer',
-        name: 'Safety Officer / Regulator',
-      };
-      localStorage.setItem(config.auth.sessionKey, JSON.stringify(user));
+  // Auth actions
+  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
+    try {
+      dispatch({ type: 'SET_LOADING', loading: true });
+      const user = await loginApi(username, password);
       dispatch({ type: 'LOGIN', user });
-
-      // Re-initialize on login
-      const nodes = initializeNodes();
-      dispatch({ type: 'SET_NODES', nodes });
-      dispatch({ type: 'SET_ALERTS', alerts: generateSeedAlerts() });
-      nodes.forEach(n => { prevRiskLevelsRef.current[n.id] = n.riskLevel; });
-
+      await reloadMineData();
       return true;
+    } catch (err) {
+      console.error('[Login Error]', err);
+      dispatch({ type: 'SET_LOADING', loading: false });
+      return false;
     }
-    return false;
-  }, []);
+  }, [reloadMineData]);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(config.auth.sessionKey);
+  const logout = useCallback(async () => {
+    await logoutApi();
     dispatch({ type: 'LOGOUT' });
   }, []);
 
@@ -232,12 +273,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_SCENARIO', scenario });
   }, []);
 
-  const acknowledgeAlertFn = useCallback((alertId: string) => {
-    dispatch({ type: 'ACKNOWLEDGE_ALERT', alertId });
+  const acknowledgeAlertFn = useCallback(async (alertId: string) => {
+    try {
+      await acknowledgeAlertApi(alertId);
+      dispatch({ type: 'ACKNOWLEDGE_ALERT', alertId });
+    } catch (err) {
+      console.error('[Acknowledge Alert Error]', err);
+    }
   }, []);
 
-  const resolveAlertFn = useCallback((alertId: string) => {
-    dispatch({ type: 'RESOLVE_ALERT', alertId });
+  const resolveAlertFn = useCallback(async (alertId: string) => {
+    try {
+      await resolveAlertApi(alertId);
+      dispatch({ type: 'RESOLVE_ALERT', alertId });
+    } catch (err) {
+      console.error('[Resolve Alert Error]', err);
+    }
   }, []);
 
   const markNotificationRead = useCallback((id: string) => {
@@ -257,6 +308,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     resolveAlert: resolveAlertFn,
     markNotificationRead,
     clearNotifications,
+    reloadMineData,
   };
 
   return React.createElement(AppContext.Provider, { value }, children);

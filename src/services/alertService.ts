@@ -1,9 +1,44 @@
-// ============================================================
-// MineSafe AI — Alert Service
-// ============================================================
-
+import { api } from './api';
+import { mapBackendAlertToFrontend } from './transformers';
 import type { Alert, AlertSeverity, AlertStatus, NodeData } from '../types';
 
+/**
+ * Fetch alerts from backend REST API with optional filtering.
+ */
+export async function fetchAlertsApi(filters?: {
+  severity?: AlertSeverity | 'ALL';
+  status?: AlertStatus | 'ALL';
+  nodeId?: string | 'ALL';
+  limit?: number;
+}): Promise<Alert[]> {
+  const params: Record<string, any> = { limit: filters?.limit || 100 };
+  if (filters?.severity && filters.severity !== 'ALL') params.severity = filters.severity;
+  if (filters?.status && filters.status !== 'ALL') params.status = filters.status;
+  if (filters?.nodeId && filters.nodeId !== 'ALL') params.node_id = filters.nodeId;
+
+  const response = await api.get('/alerts', { params });
+  return (response.data || []).map(mapBackendAlertToFrontend);
+}
+
+/**
+ * Acknowledge an active alert via REST API.
+ */
+export async function acknowledgeAlertApi(alertId: string, acknowledgedBy?: string): Promise<Alert> {
+  const response = await api.patch(`/alerts/${alertId}/acknowledge`, {
+    acknowledged_by: acknowledgedBy,
+  });
+  return mapBackendAlertToFrontend(response.data);
+}
+
+/**
+ * Resolve an alert via REST API.
+ */
+export async function resolveAlertApi(alertId: string): Promise<Alert> {
+  const response = await api.patch(`/alerts/${alertId}/resolve`);
+  return mapBackendAlertToFrontend(response.data);
+}
+
+// ── Legacy / Client-Side Simulation Helpers ──────────────────
 let alertCounter = 100;
 
 function generateId(): string {
@@ -11,9 +46,6 @@ function generateId(): string {
   return `ALT-${alertCounter}`;
 }
 
-/**
- * Generate initial seed alerts for demonstration.
- */
 export function generateSeedAlerts(): Alert[] {
   const now = new Date();
   return [
@@ -44,9 +76,6 @@ export function generateSeedAlerts(): Alert[] {
   ];
 }
 
-/**
- * Create a new alert from node state change.
- */
 export function createAlert(node: NodeData): Alert | null {
   if (node.riskLevel === 'L0') return null;
 
@@ -79,9 +108,6 @@ export function createAlert(node: NodeData): Alert | null {
   };
 }
 
-/**
- * Acknowledge an alert.
- */
 export function acknowledgeAlert(alert: Alert, user: string = 'Safety Officer'): Alert {
   return {
     ...alert,
@@ -91,9 +117,6 @@ export function acknowledgeAlert(alert: Alert, user: string = 'Safety Officer'):
   };
 }
 
-/**
- * Resolve an alert.
- */
 export function resolveAlert(alert: Alert): Alert {
   return {
     ...alert,
@@ -102,9 +125,6 @@ export function resolveAlert(alert: Alert): Alert {
   };
 }
 
-/**
- * Filter alerts by criteria.
- */
 export function filterAlerts(
   alerts: Alert[],
   filters: {

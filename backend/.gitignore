@@ -1,0 +1,67 @@
+# ============================================================
+# MineSafe AI Backend — Git Ignore Specification
+# ============================================================
+
+# --- Environment & Secret Variables ---
+.env
+.env.*
+!.env.example
+
+# --- Python Virtual Environments ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Byte-compiled / Optimized Files ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Caches & Testing Artifacts ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.nox/
+.tox/
+
+# --- Local Databases & Storage ---
+*.sqlite
+*.sqlite3
+*.db
+*.s3db
+
+# --- Build & Distribution Artifacts ---
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Logs & Temporary Files ---
+*.log
+logs/
+tmp/
+*.tmp
+
+# --- IDEs, Editors & OS Files ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

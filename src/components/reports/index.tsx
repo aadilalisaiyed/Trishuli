@@ -7,9 +7,10 @@ import {
   FileText,
   Printer,
   FileSpreadsheet,
+  RefreshCw,
 } from 'lucide-react';
 import type { ReportConfig, ReportData, NodeData, Alert } from '../../types';
-import { generateReport, exportCSV, getDefaultReportSections } from '../../services/reportService';
+import { generateReport, generateReportApi, exportCSV, exportReportCsvApi, getDefaultReportSections } from '../../services/reportService';
 import { RiskBadge } from '../common';
 import { format } from 'date-fns';
 import './report.css';
@@ -31,6 +32,7 @@ export function ReportBuilder({
   const [nodeScope, setNodeScope] = useState<string>(initialNodeId || 'ALL');
   const [region, setRegion] = useState('Central Block Pit #4');
   const [sections, setSections] = useState(getDefaultReportSections());
+  const [loading, setLoading] = useState<boolean>(false);
 
   const toggleSection = (id: string) => {
     setSections(prev =>
@@ -38,12 +40,13 @@ export function ReportBuilder({
     );
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    setLoading(true);
     const now = new Date();
     const daysBack = dateRange === '24H' ? 1 : dateRange === '7D' ? 7 : 30;
     const start = new Date(now.getTime() - daysBack * 86400000);
 
-    const config: ReportConfig = {
+    const reportConfig: ReportConfig = {
       mine,
       dateRange: { start, end: now },
       nodeScope: nodeScope === 'ALL' ? ['ALL'] : [nodeScope],
@@ -51,8 +54,16 @@ export function ReportBuilder({
       sections,
     };
 
-    const report = generateReport(config, nodes, alerts);
-    onReportGenerated(report);
+    try {
+      const report = await generateReportApi(reportConfig);
+      onReportGenerated(report);
+    } catch (err) {
+      console.warn('[Report API Fallback] Generating report locally:', err);
+      const fallbackReport = generateReport(reportConfig, nodes, alerts);
+      onReportGenerated(fallbackReport);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -131,8 +142,9 @@ export function ReportBuilder({
       </div>
 
       <div className="flex items-center gap-sm" style={{ marginTop: 20 }}>
-        <button className="btn btn-primary" onClick={handleGenerate}>
-          <FileText size={16} /> Generate Report Preview
+        <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+          {loading ? <RefreshCw size={16} className="animate-spin" /> : <FileText size={16} />}
+          <span>Generate Report Preview</span>
         </button>
       </div>
     </div>
@@ -149,19 +161,29 @@ export function ReportPreview({
   nodes: NodeData[];
   alerts: Alert[];
 }) {
+  const [exporting, setExporting] = useState<boolean>(false);
+
   const isSectionEnabled = (id: string) => {
     return report.config.sections.find(s => s.id === id)?.enabled ?? true;
   };
 
-  const handleExportCSV = () => {
-    const csv = exportCSV(nodes, alerts);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `minesafe_report_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      await exportReportCsvApi(report.config);
+    } catch (err) {
+      console.warn('[CSV Export API Fallback] Downloading CSV locally:', err);
+      const csv = exportCSV(nodes, alerts);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `minesafe_report_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handlePrint = () => {
@@ -177,8 +199,9 @@ export function ReportPreview({
           <span className="badge badge-ai">OFFICIAL TEMPLATE</span>
         </div>
         <div className="flex items-center gap-sm">
-          <button className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
-            <FileSpreadsheet size={14} /> Export CSV
+          <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} disabled={exporting}>
+            {exporting ? <RefreshCw size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+            <span>Export CSV</span>
           </button>
           <button className="btn btn-primary btn-sm" onClick={handlePrint}>
             <Printer size={14} /> Print / Export PDF

@@ -2,13 +2,14 @@
 // MineSafe AI — Node Detail Page (Screen 6)
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   MapPin,
   Wifi,
   Clock,
   ArrowLeft,
+  RefreshCw,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { RiskBadge, StatusBadge, SensorCard, TimeRangeSelector } from '../components/common';
@@ -20,6 +21,8 @@ import {
   RiskScoreAreaChart,
 } from '../components/charts';
 import { AIExplanation, RecommendationCard } from '../components/ai';
+import { fetchNodeHistoryApi, fetchNodeAIAssessmentApi } from '../services/nodesService';
+import type { NodeHistory, AIRiskAssessment } from '../types';
 import { generateNodeHistory } from '../data/historicalData';
 import { getRiskPrediction, getRecommendedActions } from '../services/aiService';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -30,11 +33,13 @@ export function NodeDetailPage() {
   const { state } = useApp();
 
   const [timeRange, setTimeRange] = useState<string>('24H');
+  const [realHistory, setRealHistory] = useState<NodeHistory | null>(null);
+  const [realAiAssessment, setRealAiAssessment] = useState<AIRiskAssessment | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Find the selected node
+  // Find target node from state
   const node = state.nodes.find(n => n.id === nodeId) || state.nodes[0];
 
-  // Hours back conversion
   const hoursBack = useMemo(() => {
     switch (timeRange) {
       case '1H': return 1;
@@ -46,8 +51,36 @@ export function NodeDetailPage() {
     }
   }, [timeRange]);
 
-  // Generate historical data for this node and scenario
-  const history = useMemo(() => {
+  // Fetch real node history & AI assessment on mount / node / timerange change
+  useEffect(() => {
+    if (!node?.id) return;
+    let isMounted = true;
+
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [hist, ai] = await Promise.all([
+          fetchNodeHistoryApi(node.id, 'all', 100),
+          fetchNodeAIAssessmentApi(node.id),
+        ]);
+        if (isMounted) {
+          setRealHistory(hist);
+          setRealAiAssessment(ai);
+        }
+      } catch (err) {
+        console.warn('[Node Detail API Fallback] Using client-side simulation:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => { isMounted = false; };
+  }, [node?.id, timeRange]);
+
+  // Fallback local history if API data is empty or loading
+  const fallbackHistory = useMemo(() => {
     return generateNodeHistory(
       node?.id || 'N03',
       hoursBack,
@@ -55,6 +88,10 @@ export function NodeDetailPage() {
       state.scenario.toLowerCase() as any
     );
   }, [node?.id, hoursBack, state.scenario]);
+
+  const activeHistory = realHistory || fallbackHistory;
+  const aiAssessment = realAiAssessment || getRiskPrediction(node);
+  const recommendedActions = realAiAssessment?.recommendedActions || getRecommendedActions(node);
 
   if (!node) {
     return (
@@ -67,9 +104,6 @@ export function NodeDetailPage() {
     );
   }
 
-  const aiAssessment = getRiskPrediction(node);
-  const recommendedActions = getRecommendedActions(node);
-
   return (
     <div style={{ padding: 'var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
       {/* Back Button & Breadcrumbs */}
@@ -80,6 +114,7 @@ export function NodeDetailPage() {
           </button>
           <span className="text-muted">/</span>
           <span className="text-sm font-semibold">Node {node.id} Deep Diagnostics</span>
+          {loading && <RefreshCw size={14} className="animate-spin text-muted" />}
         </div>
 
         {/* Global Time Range Filter */}
@@ -130,7 +165,7 @@ export function NodeDetailPage() {
         </div>
       </div>
 
-      {/* 5 Individual Sensor Indicator Cards (Spec §24) */}
+      {/* 5 Individual Sensor Indicator Cards */}
       <div>
         <div className="card-title" style={{ marginBottom: 8 }}>
           5 Monitored Deformation & Risk Indicators
@@ -183,24 +218,24 @@ export function NodeDetailPage() {
         </div>
       </div>
 
-      {/* 5-Indicator Status Grid with Explanation */}
+      {/* 5-Indicator Status Grid */}
       <SensorStatusGrid
         readings={node.readings}
         thresholds={node.thresholds}
         status={node.sensorStatus}
       />
 
-      {/* Core Time-Series Charts Grid (Spec §25, 27) */}
+      {/* Time-Series Charts Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 'var(--sp-lg)' }}>
-        {/* Predicted vs Actual Deformation (Crucial AI Visualization §27) */}
+        {/* Predicted vs Actual Deformation */}
         <ChartCard
           title="Predicted vs Actual Ground Deformation"
           subtitle="Actual (Solid Blue) vs AI Prediction Model (Dashed Purple) in mm"
           action={<span className="badge badge-ai">Horizon: {node.predictionHorizon}h</span>}
         >
           <PredictionChart
-            actualData={history.actualDeformation}
-            predictedData={history.predictedDeformation}
+            actualData={activeHistory.actualDeformation}
+            predictedData={activeHistory.predictedDeformation}
           />
         </ChartCard>
 
@@ -210,7 +245,7 @@ export function NodeDetailPage() {
           subtitle={`Current: ${node.readings.tilt.toFixed(2)}° | Local Threshold: ${node.thresholds.tilt}°`}
         >
           <TimeSeriesLineChart
-            data={history.tilt}
+            data={activeHistory.tilt}
             color="#2563EB"
             name="Tilt (°)"
             unit="°"
@@ -224,7 +259,7 @@ export function NodeDetailPage() {
           subtitle={`Current: ${node.readings.displacement.toFixed(1)} mm | Local Threshold: ${node.thresholds.displacement} mm`}
         >
           <TimeSeriesLineChart
-            data={history.displacement}
+            data={activeHistory.displacement}
             color="#0891B2"
             name="Displacement (mm)"
             unit=" mm"
@@ -238,7 +273,7 @@ export function NodeDetailPage() {
           subtitle={`Current: ${node.readings.vibration.toFixed(0)}% | Threshold: ${node.thresholds.vibration}%`}
         >
           <TimeSeriesLineChart
-            data={history.vibration}
+            data={activeHistory.vibration}
             color="#F97316"
             name="Vibration (%)"
             unit="%"
@@ -249,9 +284,9 @@ export function NodeDetailPage() {
         {/* Risk Score Area Chart */}
         <ChartCard
           title="AI Risk Probability Evolution"
-          subtitle="Simulated multi-parameter AI risk score (0-100%)"
+          subtitle="Multi-parameter AI risk score (0-100%)"
         >
-          <RiskScoreAreaChart data={history.riskScore} />
+          <RiskScoreAreaChart data={activeHistory.riskScore} />
         </ChartCard>
 
         {/* Relative Movement vs Time */}
@@ -260,7 +295,7 @@ export function NodeDetailPage() {
           subtitle={`Spatial relationship derived with neighboring nodes | Threshold: ${node.thresholds.relativeMovement} mm`}
         >
           <TimeSeriesLineChart
-            data={history.relativeMovement}
+            data={activeHistory.relativeMovement}
             color="#16A34A"
             name="Relative Movement"
             unit=" mm"
@@ -269,7 +304,7 @@ export function NodeDetailPage() {
         </ChartCard>
       </div>
 
-      {/* AI Explainability & Recommended Safety Actions Side-by-Side */}
+      {/* AI Explainability & Recommended Safety Actions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--sp-lg)' }}>
         <AIExplanation assessment={aiAssessment} />
 
@@ -281,7 +316,7 @@ export function NodeDetailPage() {
             onViewSafeZone={() => navigate(`/dashboard?node=${node.id}`)}
           />
 
-          {/* Wi-Fi Network & Hardware Health Section (Spec §75) */}
+          {/* Wi-Fi Network & Hardware Health Section */}
           <div className="card">
             <div className="card-header">
               <div className="card-title flex items-center gap-xs">
