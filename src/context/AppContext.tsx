@@ -6,7 +6,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import type { NodeData, Alert, DemoScenario, Notification, User, SystemStatus } from '../types';
 import { config } from '../config';
-import { loginApi, logoutApi, getCurrentUserApi } from '../services/authService';
+import { loginApi, logoutApi, getCurrentUserApi, registerApi, type RegisterData } from '../services/authService';
 import { fetchMineNodesApi } from '../services/nodesService';
 import { fetchAlertsApi, acknowledgeAlertApi, resolveAlertApi } from '../services/alertService';
 import { mapBackendNodeToFrontend, mapBackendAlertToFrontend } from '../services/transformers';
@@ -144,6 +144,7 @@ function reducer(state: AppState, action: Action): AppState {
 interface AppContextValue {
   state: AppState;
   login: (username: string, password: string) => Promise<boolean>;
+  register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
   setScenario: (scenario: DemoScenario) => void;
   acknowledgeAlert: (alertId: string) => Promise<void>;
@@ -264,6 +265,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [reloadMineData]);
 
+  const register = useCallback(async (data: RegisterData): Promise<boolean> => {
+    try {
+      dispatch({ type: 'SET_LOADING', loading: true });
+      const user = await registerApi(data);
+      dispatch({ type: 'LOGIN', user });
+      await reloadMineData();
+      return true;
+    } catch (err) {
+      console.error('[Register Error]', err);
+      dispatch({ type: 'SET_LOADING', loading: false });
+      throw err;
+    }
+  }, [reloadMineData]);
+
   const logout = useCallback(async () => {
     await logoutApi();
     dispatch({ type: 'LOGOUT' });
@@ -302,6 +317,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value: AppContextValue = {
     state,
     login,
+    register,
     logout,
     setScenario,
     acknowledgeAlert: acknowledgeAlertFn,

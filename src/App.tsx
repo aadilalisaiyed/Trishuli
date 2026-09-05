@@ -45,12 +45,20 @@ export function App() {
     <AppProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Auth Route */}
+          {/* Public Auth Routes */}
           <Route
             path="/login"
             element={
               <PublicRoute>
                 <LoginPage />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <PublicRoute>
+                <LoginPage initialMode="register" />
               </PublicRoute>
             }
           />

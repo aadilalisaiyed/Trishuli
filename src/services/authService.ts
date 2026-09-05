@@ -8,6 +8,28 @@ export interface TokenResponse {
   user: User;
 }
 
+export interface RegisterData {
+  username: string;
+  password: string;
+  name: string;
+  role?: string;
+}
+
+/**
+ * Registers a new user account with the backend.
+ * Stores JWT token and user profile in localStorage.
+ */
+export async function registerApi(data: RegisterData): Promise<User> {
+  const response = await api.post<TokenResponse>('/auth/register', data);
+  const { access_token, user } = response.data;
+
+  // Persist access token and user profile
+  localStorage.setItem('minesafe_access_token', access_token);
+  localStorage.setItem(config.auth.sessionKey, JSON.stringify(user));
+
+  return user;
+}
+
 /**
  * Authenticates user credentials with the backend.
  * Stores JWT token and user profile in localStorage.
