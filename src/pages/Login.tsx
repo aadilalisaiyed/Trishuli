@@ -465,18 +465,50 @@ export function LoginPage({ initialMode }: LoginProps) {
           {/* Credentials Box for Quick Reference in Login mode */}
           {mode === 'login' && (
             <div style={{
-              marginTop: 28,
+              marginTop: 24,
               background: 'var(--bg)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--r-md)',
               padding: '12px 14px',
             }}>
-              <div className="text-xs" style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                DEMO BACKEND CREDENTIALS:
+              <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                <span className="text-xs" style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  SAMPLE ROLE CREDENTIALS:
+                </span>
+                <span className="text-xs text-muted" style={{ fontSize: '0.7rem' }}>Click to autofill</span>
               </div>
-              <div className="text-xs text-muted" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Username: <code>{config.auth.demoUsername}</code></span>
-                <span>Password: <code>{config.auth.demoPassword}</code></span>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {[
+                  { role: 'Safety Officer', user: 'admin', pass: 'minesafe2026' },
+                  { role: 'Geotech Engineer', user: 'geotech', pass: 'minesafe2026' },
+                  { role: 'Mine Manager', user: 'manager', pass: 'minesafe2026' },
+                  { role: 'DGMS Inspector', user: 'inspector', pass: 'minesafe2026' },
+                ].map(c => (
+                  <button
+                    key={c.user}
+                    type="button"
+                    onClick={() => { setUsername(c.user); setPassword(c.pass); setError(''); }}
+                    style={{
+                      background: username === c.user ? 'var(--primary-bg, #EFF6FF)' : '#FFFFFF',
+                      border: `1px solid ${username === c.user ? 'var(--primary)' : 'var(--border)'}`,
+                      borderRadius: 'var(--r-sm)',
+                      padding: '6px 8px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: username === c.user ? 'var(--primary)' : 'var(--text-primary)' }}>
+                      {c.role}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      ID: <code>{c.user}</code>
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}

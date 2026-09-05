@@ -37,18 +37,52 @@ def seed_database():
 
         print("Seeding database with prototype data...")
 
-        # 1. Admin User
-        admin_user = db.query(User).filter(User.username == "admin").first()
-        if not admin_user:
-            admin_user = User(
-                username="admin",
-                password_hash=hash_password("minesafe2026"),
-                name="Safety Officer / Regulator",
-                role="Safety Officer",
-                is_active=True,
-            )
-            db.add(admin_user)
-            print("  Created default admin user (username: 'admin').")
+        # 1. Sample Users / Role-Based Credentials
+        sample_users = [
+            {
+                "username": "admin",
+                "password": "minesafe2026",
+                "name": "Shri Rajesh Sharma",
+                "role": "Safety Officer",
+            },
+            {
+                "username": "geotech",
+                "password": "minesafe2026",
+                "name": "Dr. Ananya Verma",
+                "role": "Geotechnical Engineer",
+            },
+            {
+                "username": "manager",
+                "password": "minesafe2026",
+                "name": "Er. Vikram Patel",
+                "role": "Mine Manager",
+            },
+            {
+                "username": "inspector",
+                "password": "minesafe2026",
+                "name": "Shri Amit Sinha",
+                "role": "DGMS Inspector",
+            },
+            {
+                "username": "gis_analyst",
+                "password": "minesafe2026",
+                "name": "Pooja Iyer",
+                "role": "GIS Analyst",
+            },
+        ]
+
+        for u in sample_users:
+            user_rec = db.query(User).filter(User.username == u["username"]).first()
+            if not user_rec:
+                user_rec = User(
+                    username=u["username"],
+                    password_hash=hash_password(u["password"]),
+                    name=u["name"],
+                    role=u["role"],
+                    is_active=True,
+                )
+                db.add(user_rec)
+                print(f"  Created user: {u['username']} ({u['role']})")
 
         # 2. Mine 'PROTO-01'
         mine = Mine(
