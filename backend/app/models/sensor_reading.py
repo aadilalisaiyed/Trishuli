@@ -7,7 +7,7 @@
 
 from datetime import datetime
 from sqlalchemy import (
-    BigInteger, String, Double, Boolean, SmallInteger,
+    BigInteger, Integer, String, Double, Boolean, SmallInteger,
     DateTime, ForeignKey, Index, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -24,7 +24,11 @@ class SensorReading(Base):
         Index("idx_sensor_readings_timestamp", "timestamp"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     node_id: Mapped[str] = mapped_column(
         String(16), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False
     )

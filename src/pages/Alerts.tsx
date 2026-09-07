@@ -72,24 +72,24 @@ export function AlertsPage() {
         gap: 'var(--sp-md)',
       }}>
         <MetricCard
-          label="L3 Critical (Active)"
+          label="Critical (Active)"
           value={l3Count}
           color="var(--critical)"
-          trend="All 5 indicators abnormal"
+          trend="Highest live risk category"
           onClick={() => { setSeverityFilter('L3'); setStatusFilter('ACTIVE'); }}
         />
         <MetricCard
-          label="L2 Warning (Active)"
+          label="Warning (Active)"
           value={l2Count}
           color="var(--warning)"
-          trend="3-4 indicators abnormal"
+          trend="Elevated live risk category"
           onClick={() => { setSeverityFilter('L2'); setStatusFilter('ACTIVE'); }}
         />
         <MetricCard
-          label="L1 Watch (Active)"
+          label="Watch (Active)"
           value={l1Count}
           color="#A16207"
-          trend="1-2 indicators abnormal"
+          trend="Early warning category"
           onClick={() => { setSeverityFilter('L1'); setStatusFilter('ACTIVE'); }}
         />
         <MetricCard
@@ -116,9 +116,9 @@ export function AlertsPage() {
               onChange={e => setSeverityFilter(e.target.value as any)}
             >
               <option value="ALL">All Severities</option>
-              <option value="L3">L3 Critical</option>
-              <option value="L2">L2 Warning</option>
-              <option value="L1">L1 Watch</option>
+              <option value="L3">Critical</option>
+              <option value="L2">Warning</option>
+              <option value="L1">Watch</option>
             </select>
 
             {/* Status Filter */}
@@ -201,7 +201,7 @@ export function AlertsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">4. Crack Sensor:</span>
-                  <strong>On Detection</strong>
+                    <strong>Triggered</strong>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">5. Relative Movement:</span>

@@ -2,7 +2,7 @@
 // MineSafe AI — Analytics & Historical AI Performance (Screen 2)
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Sparkles,
 } from 'lucide-react';
@@ -15,7 +15,40 @@ import {
   RiskScoreAreaChart,
   RiskDistributionBarChart,
 } from '../components/charts';
-import { generateAllNodeHistory } from '../data/historicalData';
+import { fetchNodeHistoryApi } from '../services/nodesService';
+import type { NodeHistory } from '../types';
+
+function emptyHistory(nodeId: string): NodeHistory {
+  return {
+    nodeId,
+    tilt: [],
+    displacement: [],
+    vibration: [],
+    crackEvents: [],
+    relativeMovement: [],
+    riskScore: [],
+    predictedDeformation: [],
+    actualDeformation: [],
+  };
+}
+
+function combineHistories(histories: NodeHistory[]): NodeHistory {
+  const combined = emptyHistory('ALL');
+  for (const history of histories) {
+    combined.tilt.push(...history.tilt);
+    combined.displacement.push(...history.displacement);
+    combined.vibration.push(...history.vibration);
+    combined.crackEvents.push(...history.crackEvents);
+    combined.relativeMovement.push(...history.relativeMovement);
+    combined.riskScore.push(...history.riskScore);
+    combined.predictedDeformation.push(...history.predictedDeformation);
+    combined.actualDeformation.push(...history.actualDeformation);
+  }
+  for (const series of Object.values(combined).filter(Array.isArray) as NodeHistory[keyof NodeHistory][]) {
+    (series as NodeHistory['tilt']).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  }
+  return combined;
+}
 
 export function AnalyticsPage() {
   const { state } = useApp();
@@ -23,6 +56,8 @@ export function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<string>('24H');
   const [selectedNodeId, setSelectedNodeId] = useState<string>('ALL');
   const [selectedMetric, setSelectedMetric] = useState<string>('ALL');
+  const [histories, setHistories] = useState<Record<string, NodeHistory>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const hoursBack = useMemo(() => {
     switch (timeRange) {
@@ -35,19 +70,32 @@ export function AnalyticsPage() {
     }
   }, [timeRange]);
 
-  // Generate historical data for all nodes
-  const allHistory = useMemo(() => {
-    return generateAllNodeHistory(hoursBack, 60, state.scenario.toLowerCase() as any);
-  }, [hoursBack, state.scenario]);
+  useEffect(() => {
+    let mounted = true;
+    const loadHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const nodeIds = selectedNodeId === 'ALL' ? state.nodes.map(node => node.id) : [selectedNodeId];
+        const loaded = await Promise.all(nodeIds.map(async nodeId => [nodeId, await fetchNodeHistoryApi(nodeId, 'all', 100)] as const));
+        if (mounted) setHistories(Object.fromEntries(loaded));
+      } catch (error) {
+        console.warn('[Analytics History] Failed to load backend history:', error);
+        if (mounted) setHistories({});
+      } finally {
+        if (mounted) setHistoryLoading(false);
+      }
+    };
+    if (state.nodes.length > 0) loadHistory();
+    return () => { mounted = false; };
+  }, [selectedNodeId, state.nodes, hoursBack]);
 
   // Aggregate or single node data
   const targetHistory = useMemo(() => {
-    if (selectedNodeId !== 'ALL' && allHistory[selectedNodeId]) {
-      return allHistory[selectedNodeId];
+    if (selectedNodeId !== 'ALL') {
+      return histories[selectedNodeId] || emptyHistory(selectedNodeId);
     }
-    // Default to N03 if all, or combine
-    return allHistory.N03;
-  }, [selectedNodeId, allHistory]);
+    return combineHistories(Object.values(histories));
+  }, [selectedNodeId, histories]);
 
   // Calculate Summary KPI stats from current state
   const avgTilt = (state.nodes.reduce((acc, n) => acc + n.readings.tilt, 0) / state.nodes.length || 0).toFixed(2);
@@ -57,12 +105,15 @@ export function AnalyticsPage() {
   const avgRiskScore = Math.round(state.nodes.reduce((acc, n) => acc + n.riskScore, 0) / state.nodes.length || 0);
 
   // Risk distribution data
+  const totalNodes = state.nodes.length || 1;
   const riskDistributionData = [
-    { level: 'L0 Normal', percentage: state.scenario === 'NORMAL' ? 100 : state.scenario === 'WARNING' ? 66 : 33, color: '#16A34A' },
-    { level: 'L1 Watch', percentage: state.scenario === 'WARNING' ? 0 : state.scenario === 'CRITICAL' ? 33 : 0, color: '#EAB308' },
-    { level: 'L2 Warning', percentage: state.scenario === 'WARNING' ? 34 : 0, color: '#F97316' },
-    { level: 'L3 Critical', percentage: state.scenario === 'CRITICAL' ? 34 : 0, color: '#DC2626' },
+    { level: 'Normal', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L0').length / totalNodes * 100), color: '#16A34A' },
+    { level: 'Watch', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L1').length / totalNodes * 100), color: '#EAB308' },
+    { level: 'Warning', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L2').length / totalNodes * 100), color: '#F97316' },
+    { level: 'Critical', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L3').length / totalNodes * 100), color: '#DC2626' },
   ];
+  const selectedNode = state.nodes.find(node => node.id === selectedNodeId);
+  const meanConfidence = Math.round(state.nodes.reduce((sum, node) => sum + node.aiConfidence, 0) / totalNodes);
 
   return (
     <div style={{ padding: 'var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
@@ -135,9 +186,9 @@ export function AnalyticsPage() {
           color="var(--ai)"
         />
         <MetricCard
-          label="AI Model Accuracy"
-          value="91.2%"
-          trend="Prototype ML Benchmark"
+          label="Validated Macro-F1"
+          value="92.1%"
+          trend="10 held-out node geometries"
           color="var(--success)"
         />
       </div>
@@ -149,7 +200,7 @@ export function AnalyticsPage() {
           <ChartCard
             title="Predicted vs Actual Ground Deformation"
             subtitle={`Node: ${selectedNodeId} | Actual (Solid Blue) vs AI Prediction Model (Dashed Purple)`}
-            action={<span className="badge badge-ai">Horizon: 6h</span>}
+            action={<span className="badge badge-ai">Backend telemetry{historyLoading ? ' · loading' : ''}</span>}
           >
             <PredictionChart
               actualData={targetHistory.actualDeformation}
@@ -169,7 +220,7 @@ export function AnalyticsPage() {
               color="#2563EB"
               name="Tilt (°)"
               unit="°"
-              threshold={0.50}
+              threshold={selectedNode?.thresholds.tilt}
             />
           </ChartCard>
         )}
@@ -185,7 +236,7 @@ export function AnalyticsPage() {
               color="#0891B2"
               name="Displacement (mm)"
               unit=" mm"
-              threshold={10.0}
+              threshold={selectedNode?.thresholds.displacement}
             />
           </ChartCard>
         )}
@@ -201,7 +252,7 @@ export function AnalyticsPage() {
               color="#F97316"
               name="Vibration (%)"
               unit="%"
-              threshold={52.0}
+              threshold={selectedNode?.thresholds.vibration}
             />
           </ChartCard>
         )}
@@ -227,7 +278,7 @@ export function AnalyticsPage() {
               color="#16A34A"
               name="Relative Movement"
               unit=" mm"
-              threshold={8.0}
+              threshold={selectedNode?.thresholds.relativeMovement}
             />
           </ChartCard>
         )}
@@ -238,7 +289,7 @@ export function AnalyticsPage() {
         {/* Risk Distribution Chart */}
         <ChartCard
           title="Mine Risk Level Distribution"
-          subtitle="Percentage share of monitoring nodes across L0-L3 severity states"
+          subtitle="Percentage share of monitoring nodes across real backend risk states"
         >
           <RiskDistributionBarChart data={riskDistributionData} />
         </ChartCard>
@@ -250,32 +301,26 @@ export function AnalyticsPage() {
               <Sparkles size={16} color="var(--ai)" />
               <span>AI Subsidence Model Validation Metrics</span>
             </div>
-            <span className="badge badge-ai">PROTOTYPE AI METRICS</span>
+            <span className="badge badge-ai">VALIDATED BENCHMARK</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>
-              <div className="text-xs text-muted">Prediction Accuracy</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>91.2%</div>
-              <div className="text-xs text-muted">vs Ground Truth</div>
+              <div className="text-xs text-muted">Macro-F1</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>92.1%</div>
+              <div className="text-xs text-muted">10 held-out node geometries</div>
             </div>
 
             <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>
               <div className="text-xs text-muted">Mean AI Confidence</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--ai)' }}>88.6%</div>
-              <div className="text-xs text-muted">Model certainty score</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--ai)' }}>{meanConfidence}%</div>
+              <div className="text-xs text-muted">Live node confidence mean</div>
             </div>
 
-            <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>
-              <div className="text-xs text-muted">Anomaly Detection Rate</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>94.0%</div>
-              <div className="text-xs text-muted">Sensitivity benchmark</div>
-            </div>
-
-            <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>
-              <div className="text-xs text-muted">False Alert Rate</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--warning)' }}>5.8%</div>
-              <div className="text-xs text-muted">Below 8% threshold</div>
+            <div style={{ gridColumn: '1 / -1', background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>
+              <div className="text-xs text-muted">Critical-class validation caveat</div>
+              <div className="text-sm" style={{ marginTop: 4 }}>Critical precision 73.6% · recall 86.8%</div>
+              <div className="text-xs text-muted">Warning/Critical boundary performance is weaker.</div>
             </div>
           </div>
 
@@ -285,8 +330,8 @@ export function AnalyticsPage() {
             borderRadius: 'var(--r-sm)',
             padding: '8px 10px',
           }}>
-            <strong>Notice:</strong> Demonstration validation values calculated over synthetic benchmark test sets.
-            All AI inferences are simulated in the browser prototype.
+            <strong>Data note:</strong> Charts use backend historical telemetry. Macro-F1 is a validated offline benchmark;
+            it is not a live accuracy measurement.
           </div>
         </div>
       </div>

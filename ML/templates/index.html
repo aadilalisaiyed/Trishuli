@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mine Subsidence Early Warning</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">FIELD MONITORING / PI SERVER</p>
+        <h1>Mine Subsidence Early Warning</h1>
+        <p class="subhead">Live telemetry from connected ESP8266 sensor nodes</p>
+      </div>
+      <div class="connection"><span id="connection-dot"></span><span id="connection-text">Connecting</span></div>
+    </header>
+    <section class="summary" aria-label="System summary">
+      <div><span class="summary-label">Last update</span><strong id="last-update">--</strong></div>
+      <div><span class="summary-label">Known devices</span><strong id="device-count">0</strong></div>
+      <div><span class="summary-label">Readings retained</span><strong id="reading-count">0</strong></div>
+    </section>
+    <section class="grid charts">
+      <article class="panel risk-panel">
+        <div class="panel-heading"><div><p class="eyebrow">CURRENT DISTRIBUTION</p><h2>Risk state counts</h2></div></div>
+        <div class="chart-wrap risk-chart"><canvas id="risk-chart"></canvas></div>
+      </article>
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">RECENT TELEMETRY</p><h2>Confidence and latency</h2></div><span class="unit">last 100</span></div>
+        <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+      </article>
+    </section>
+    <section class="panel readings-panel">
+      <div class="panel-heading"><div><p class="eyebrow">NODE ACTIVITY</p><h2>Most recent readings</h2></div><span class="unit" id="table-note">waiting for data</span></div>
+      <div class="table-scroll">
+        <table><thead><tr><th>Timestamp</th><th>Device</th><th>Risk</th><th>Confidence</th></tr></thead><tbody id="readings-body"><tr><td colspan="4" class="empty">No readings received yet</td></tr></tbody></table>
+      </div>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>

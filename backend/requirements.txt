@@ -23,3 +23,8 @@ python-dateutil==2.9.0
 
 # Environment
 python-dotenv==1.0.1
+
+# ESP8266 live telemetry inference
+numpy
+scikit-learn
+joblib

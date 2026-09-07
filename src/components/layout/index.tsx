@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Map, BarChart3, FileText, Server, AlertTriangle,
-  Bell, LogOut, Menu, X, Shield, ChevronDown, Activity
+  Bell, LogOut, Menu, X, Shield, ChevronDown, Activity, Radio
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { config } from '../../config';
@@ -180,6 +180,7 @@ function NavigationLinks({ onClick }: { onClick?: () => void }) {
     { to: '/report', icon: <FileText size={18} />, label: 'Report' },
     { to: '/server', icon: <Server size={18} />, label: 'Server Status' },
     { to: '/alerts', icon: <AlertTriangle size={18} />, label: 'Alerts' },
+    { to: '/esp8266', icon: <Radio size={18} />, label: 'ESP8266 Live' },
   ];
 
   return (

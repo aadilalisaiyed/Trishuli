@@ -1,0 +1,52 @@
+(FaultDetect) nirmalya@NTOP:~/Desktop/SIH_2026/Draft3$ python train_model_v3.py
+Loading dataset...
+Loaded 100000 rows across 50 nodes.
+
+Train nodes: 40  |  Test nodes (held out): 10
+Train rows: 80000  |  Test rows: 20000
+
+=== Stage 1: Isolation Forest ===
+  Recall on true non-normal: 0.789
+  False positive rate: 0.038
+
+=== Stage 2: RandomizedSearchCV (5-fold CV, this is the part that takes real time) ===
+Fitting 5 folds for each of 40 candidates, totalling 200 fits
+
+Best params: {'n_estimators': 400, 'min_samples_split': 10, 'min_samples_leaf': 4, 'max_features': 0.7, 'max_depth': None, 'class_weight': 'balanced_subsample'}
+Best CV macro-F1: 0.957
+
+=== Held-out test performance (10 unseen mine geometries) ===
+              precision    recall  f1-score   support
+
+    critical      0.736     0.868     0.797       235
+      normal      0.997     0.997     0.997     10852
+     warning      0.970     0.856     0.910      1944
+       watch      0.967     0.992     0.979      6969
+
+    accuracy                          0.980     20000
+   macro avg      0.918     0.928     0.921     20000
+weighted avg      0.981     0.980     0.980     20000
+
+Confusion matrix (rows=actual, cols=predicted):
+          normal  watch  warning  critical
+normal     10822     30        0         0
+watch         36   6913       20         0
+warning        0    207     1664        73
+critical       0      0       31       204
+
+Top features:
+  load_delta_kg_roll_mean: 0.268
+  load_delta_kg: 0.230
+  distance_cm_roll_mean: 0.186
+  distance_cm: 0.101
+  accel_rms_roll_mean: 0.069
+  accel_rms: 0.044
+  moisture_roll_mean: 0.031
+  strain_mm_per_m_roll_mean: 0.012
+  moisture: 0.011
+  accel_rms_roll_std: 0.011
+
+Total wall time: 1586.1s
+Saved: anomaly_model_v3.joblib, risk_classifier_v3.joblib, feature_scaler_v3.joblib, feature_cols_v3.joblib, cv_results_v3.csv
+(FaultDetect) nirmalya@NTOP:~/Desktop/SIH_2026/Draft3$ 
+

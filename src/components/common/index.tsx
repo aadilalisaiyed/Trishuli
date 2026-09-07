@@ -5,17 +5,17 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle, AlertCircle, Info, Loader, Inbox, WifiOff } from 'lucide-react';
 import type { RiskLevel } from '../../types';
+import { displayRiskLabel } from '../../services/riskTaxonomy';
 
 // --- Risk Badge ---
 export function RiskBadge({ level, size = 'md' }: { level: RiskLevel; size?: 'sm' | 'md' | 'lg' }) {
-  const labels: Record<RiskLevel, string> = { L0: 'NORMAL', L1: 'WATCH', L2: 'WARNING', L3: 'CRITICAL' };
   const icons: Record<RiskLevel, string> = { L0: '🟢', L1: '🟡', L2: '🟠', L3: '🔴' };
   const cls = size === 'lg' ? 'badge badge-lg' : size === 'sm' ? 'badge badge-sm' : 'badge';
 
   return (
     <span className={`${cls} badge-${level}`} style={size === 'lg' ? { fontSize: '0.8125rem', padding: '4px 12px' } : undefined}>
       <span>{icons[level]}</span>
-      <span>{level} {labels[level]}</span>
+      <span>{displayRiskLabel(level).toUpperCase()}</span>
     </span>
   );
 }

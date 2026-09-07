@@ -2,31 +2,25 @@
 // MineSafe AI — Server & Infrastructure Status (Screen 4)
 // ============================================================
 
-import {
-  Database,
-  Wifi,
-  Cpu,
-  Radio,
-  Layers,
-  Clock,
-  Battery,
-  Activity,
-} from 'lucide-react';
+import { Wifi, Clock, Battery, Activity, Radio } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { StatusBadge } from '../components/common';
 import { formatDistanceToNowStrict } from 'date-fns';
+import { fetchESP8266Readings, type ESP8266Reading } from '../services/esp8266Service';
 
 export function ServerStatusPage() {
   const { state } = useApp();
+  const [telemetry, setTelemetry] = useState<ESP8266Reading[]>([]);
 
-  const services = [
-    { name: 'Telemetry Data Ingestion', icon: <Radio size={18} color="var(--primary)" />, status: 'Healthy', latency: '12ms', uptime: '99.98%' },
-    { name: 'Subsidence AI Inference Engine', icon: <Cpu size={18} color="var(--ai)" />, status: 'Healthy', latency: '45ms', uptime: '99.95%' },
-    { name: 'Time-Series Geotechnical DB', icon: <Database size={18} color="var(--info)" />, status: 'Healthy', latency: '8ms', uptime: '99.99%' },
-    { name: 'GIS & Satellite Map Tile Server', icon: <Layers size={18} color="var(--success)" />, status: 'Healthy', latency: '24ms', uptime: '99.90%' },
-    { name: 'ESP32 Wi-Fi Gateway Interface', icon: <Wifi size={18} color="var(--warning)" />, status: 'Healthy', latency: '18ms', uptime: '99.85%' },
-    { name: 'Early Warning Dispatch API', icon: <Activity size={18} color="var(--critical)" />, status: 'Healthy', latency: '15ms', uptime: '100.0%' },
-  ];
+  useEffect(() => {
+    fetchESP8266Readings().then(setTelemetry).catch(() => setTelemetry([]));
+  }, []);
+
+  const averageLatency = useMemo(() => {
+    if (!telemetry.length) return null;
+    return telemetry.reduce((sum, reading) => sum + reading.latency_ms, 0) / telemetry.length;
+  }, [telemetry]);
 
   return (
     <div style={{ padding: 'var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
@@ -38,7 +32,17 @@ export function ServerStatusPage() {
             Status of ESP32 surface sensor nodes, Wi-Fi telemetry pipelines, and AI computing layers
           </p>
         </div>
-        <span className="badge badge-ai">FRONTEND SIMULATION ARCHITECTURE</span>
+        <span className="badge badge-ai">PROTOTYPE / DEMONSTRATION DATA</span>
+      </div>
+
+      <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
+        <div className="card-title flex items-center gap-xs"><Radio size={16} color="var(--primary)" /> Live Pi telemetry</div>
+        <div className="flex items-center gap-lg flex-wrap text-sm" style={{ marginTop: 10 }}>
+          <span>Devices reporting: <strong>{telemetry.length}</strong></span>
+          <span>Measured Pi inference latency: <strong>{averageLatency === null ? '—' : `${averageLatency.toFixed(1)} ms`}</strong></span>
+          <span>Source: <strong>GET /api/v1/esp8266/latest</strong></span>
+        </div>
+        <p className="text-xs text-muted" style={{ marginTop: 8 }}>Uptime, GIS latency, RSSI, battery, and coordinates are not claimed as live hardware measurements here.</p>
       </div>
 
       {/* System Infrastructure Health Grid (Spec §41) */}
@@ -46,29 +50,9 @@ export function ServerStatusPage() {
         <div className="card-title" style={{ marginBottom: 10 }}>
           Core Infrastructure Subsystems
         </div>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 'var(--sp-md)',
-        }}>
-          {services.map((svc, idx) => (
-            <div key={idx} className="card" style={{ padding: '14px 16px' }}>
-              <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-                <div className="flex items-center gap-sm">
-                  {svc.icon}
-                  <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{svc.name}</span>
-                </div>
-                <span className="badge" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>
-                  <span className="status-dot status-dot-success" />
-                  {svc.status}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-muted" style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border-light)' }}>
-                <span>Latency: <strong>{svc.latency}</strong></span>
-                <span>Uptime: <strong>{svc.uptime}</strong></span>
-              </div>
-            </div>
-          ))}
+        <div className="card" style={{ background: 'var(--bg)' }}>
+          <div className="text-sm">Static subsystem latency and uptime claims were removed because the current hardware/backend does not measure them.</div>
+          <div className="text-xs text-muted" style={{ marginTop: 6 }}>Only measured Pi inference telemetry is shown above.</div>
         </div>
       </div>
 
@@ -79,7 +63,7 @@ export function ServerStatusPage() {
             <Wifi size={16} color="var(--primary)" />
             <span>ESP32 Physical Nodes Telemetry & Wireless Link Quality</span>
           </div>
-          <span className="text-xs text-muted">3 / 3 Nodes Connected</span>
+          <span className="text-xs text-muted">{state.nodes.filter(node => node.status === 'Online').length} / {state.nodes.length} backend nodes online</span>
         </div>
 
         <div className="overflow-auto" style={{ margin: '-8px -16px -16px -16px' }}>

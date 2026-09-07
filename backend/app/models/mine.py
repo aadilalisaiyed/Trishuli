@@ -4,10 +4,9 @@
 
 from datetime import datetime
 from sqlalchemy import String, Double, DateTime, func
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, JSONCompatible
 
 
 class Mine(Base):
@@ -18,7 +17,7 @@ class Mine(Base):
     location: Mapped[str] = mapped_column(String(256), nullable=False)
     latitude: Mapped[float] = mapped_column(Double, nullable=False)
     longitude: Mapped[float] = mapped_column(Double, nullable=False)
-    boundary: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)  # [[lat, lng], ...]
+    boundary: Mapped[list] = mapped_column(JSONCompatible(), nullable=False, default=list)  # [[lat, lng], ...]
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

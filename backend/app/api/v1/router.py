@@ -12,6 +12,7 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.system import router as system_router
 from app.api.v1.websocket import router as websocket_router
+from app.api.v1.esp8266 import router as esp8266_router
 
 api_v1_router = APIRouter()
 
@@ -25,3 +26,4 @@ api_v1_router.include_router(analytics_router)
 api_v1_router.include_router(reports_router)
 api_v1_router.include_router(system_router)
 api_v1_router.include_router(websocket_router)
+api_v1_router.include_router(esp8266_router)

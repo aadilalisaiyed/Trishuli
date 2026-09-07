@@ -3,10 +3,9 @@
 # ============================================================
 
 from sqlalchemy import String, Double, ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.core.database import Base, JSONCompatible
 
 
 class EvacuationRoute(Base):
@@ -24,7 +23,7 @@ class EvacuationRoute(Base):
         String(16), ForeignKey("safe_zones.id", ondelete="SET NULL"), nullable=True
     )
     distance: Mapped[float] = mapped_column(Double, nullable=False)           # meters
-    points: Mapped[list] = mapped_column(JSONB, nullable=False, default=list) # [[lat, lng], ...]
+    points: Mapped[list] = mapped_column(JSONCompatible(), nullable=False, default=list) # [[lat, lng], ...]
 
     # ── Relationships ─────────────────────────────────────────
     mine: Mapped["Mine"] = relationship("Mine", back_populates="evacuation_routes")  # noqa: F821

@@ -13,6 +13,7 @@ import { ReportPage } from './pages/Report';
 import { ServerStatusPage } from './pages/ServerStatus';
 import { AlertsPage } from './pages/Alerts';
 import { NodeDetailPage } from './pages/NodeDetail';
+import { ESP8266LivePage } from './pages/ESP8266Live';
 
 // Protected Route Guard
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -111,6 +112,15 @@ export function App() {
             element={
               <ProtectedRoute>
                 <AlertsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/esp8266"
+            element={
+              <ProtectedRoute>
+                <ESP8266LivePage />
               </ProtectedRoute>
             }
           />
