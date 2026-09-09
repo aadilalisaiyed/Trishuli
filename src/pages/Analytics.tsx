@@ -15,7 +15,7 @@ import {
   RiskScoreAreaChart,
   RiskDistributionBarChart,
 } from '../components/charts';
-import { fetchNodeHistoryApi } from '../services/nodesService';
+import { fetchAnalyticsSummaryApi, fetchNodeHistoryApi, fetchRiskDistributionApi } from '../services/nodesService';
 import type { NodeHistory } from '../types';
 
 function emptyHistory(nodeId: string): NodeHistory {
@@ -58,6 +58,8 @@ export function AnalyticsPage() {
   const [selectedMetric, setSelectedMetric] = useState<string>('ALL');
   const [histories, setHistories] = useState<Record<string, NodeHistory>>({});
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [analyticsSummary, setAnalyticsSummary] = useState<Awaited<ReturnType<typeof fetchAnalyticsSummaryApi>> | null>(null);
+  const [backendRiskDistribution, setBackendRiskDistribution] = useState<Awaited<ReturnType<typeof fetchRiskDistributionApi>>>([]);
 
   const hoursBack = useMemo(() => {
     switch (timeRange) {
@@ -75,12 +77,26 @@ export function AnalyticsPage() {
     const loadHistory = async () => {
       setHistoryLoading(true);
       try {
+        const now = new Date();
+        const from = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
         const nodeIds = selectedNodeId === 'ALL' ? state.nodes.map(node => node.id) : [selectedNodeId];
-        const loaded = await Promise.all(nodeIds.map(async nodeId => [nodeId, await fetchNodeHistoryApi(nodeId, 'all', 100)] as const));
-        if (mounted) setHistories(Object.fromEntries(loaded));
+        const [loaded, summary, distribution] = await Promise.all([
+          Promise.all(nodeIds.map(async nodeId => [nodeId, await fetchNodeHistoryApi(nodeId, 'all', 1000, from, now)] as const)),
+          fetchAnalyticsSummaryApi('PROTO-01', from, now),
+          fetchRiskDistributionApi('PROTO-01', from, now),
+        ]);
+        if (mounted) {
+          setHistories(Object.fromEntries(loaded));
+          setAnalyticsSummary(summary);
+          setBackendRiskDistribution(distribution);
+        }
       } catch (error) {
         console.warn('[Analytics History] Failed to load backend history:', error);
-        if (mounted) setHistories({});
+        if (mounted) {
+          setHistories({});
+          setAnalyticsSummary(null);
+          setBackendRiskDistribution([]);
+        }
       } finally {
         if (mounted) setHistoryLoading(false);
       }
@@ -98,22 +114,21 @@ export function AnalyticsPage() {
   }, [selectedNodeId, histories]);
 
   // Calculate Summary KPI stats from current state
-  const avgTilt = (state.nodes.reduce((acc, n) => acc + n.readings.tilt, 0) / state.nodes.length || 0).toFixed(2);
-  const maxDisplacement = Math.max(...state.nodes.map(n => n.readings.displacement), 0).toFixed(1);
-  const peakVibration = Math.max(...state.nodes.map(n => n.readings.vibration), 0).toFixed(0);
-  const crackEventsTotal = state.nodes.filter(n => n.readings.crackDetected).length;
-  const avgRiskScore = Math.round(state.nodes.reduce((acc, n) => acc + n.riskScore, 0) / state.nodes.length || 0);
+  const avgTilt = (analyticsSummary?.avgTilt ?? 0).toFixed(2);
+  const maxDisplacement = (analyticsSummary?.maxDisplacement ?? 0).toFixed(1);
+  const peakVibration = (analyticsSummary?.peakVibration ?? 0).toFixed(0);
+  const crackEventsTotal = analyticsSummary?.crackEventsTotal ?? 0;
+  const avgRiskScore = Math.round(analyticsSummary?.avgRiskScore ?? 0);
 
   // Risk distribution data
-  const totalNodes = state.nodes.length || 1;
-  const riskDistributionData = [
-    { level: 'Normal', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L0').length / totalNodes * 100), color: '#16A34A' },
-    { level: 'Watch', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L1').length / totalNodes * 100), color: '#EAB308' },
-    { level: 'Warning', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L2').length / totalNodes * 100), color: '#F97316' },
-    { level: 'Critical', percentage: Math.round(state.nodes.filter(n => n.riskLevel === 'L3').length / totalNodes * 100), color: '#DC2626' },
-  ];
+  const riskLevelLabels: Record<string, string> = { L0: 'Normal', L1: 'Watch', L2: 'Warning', L3: 'Critical' };
+  const riskDistributionData = backendRiskDistribution.map(item => ({
+    level: riskLevelLabels[item.level] || item.level,
+    percentage: item.percentage,
+    color: item.color,
+  }));
   const selectedNode = state.nodes.find(node => node.id === selectedNodeId);
-  const meanConfidence = Math.round(state.nodes.reduce((sum, node) => sum + node.aiConfidence, 0) / totalNodes);
+  const meanConfidence = Math.round(analyticsSummary?.aiPredictionAccuracy ?? 0);
 
   return (
     <div style={{ padding: 'var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
@@ -307,8 +322,8 @@ export function AnalyticsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>
               <div className="text-xs text-muted">Macro-F1</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>92.1%</div>
-              <div className="text-xs text-muted">10 held-out node geometries</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>{analyticsSummary ? `${meanConfidence}%` : '—'}</div>
+              <div className="text-xs text-muted">Average confidence from backend telemetry</div>
             </div>
 
             <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--r-md)' }}>

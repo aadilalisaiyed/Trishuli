@@ -97,5 +97,5 @@ def create_all_tables():
     Called once on application startup.
     Import all model modules here so their metadata is registered.
     """
-    from app.models import user, mine, node, sensor_reading, alert, safe_zone, evacuation_route, notification  # noqa: F401
+    from app.models import user, mine, node, sensor_reading, alert, safe_zone, evacuation_route, notification, esp8266_telemetry  # noqa: F401
     Base.metadata.create_all(bind=engine)

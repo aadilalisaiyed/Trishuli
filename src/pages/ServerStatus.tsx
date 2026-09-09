@@ -8,13 +8,24 @@ import { useApp } from '../context/AppContext';
 import { StatusBadge } from '../components/common';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { fetchESP8266Readings, type ESP8266Reading } from '../services/esp8266Service';
+import { api } from '../services/api';
 
 export function ServerStatusPage() {
   const { state } = useApp();
   const [telemetry, setTelemetry] = useState<ESP8266Reading[]>([]);
+  const [systemHealth, setSystemHealth] = useState<Array<{ name: string; status: string; latency_ms?: number | null }>>([]);
 
   useEffect(() => {
-    fetchESP8266Readings().then(setTelemetry).catch(() => setTelemetry([]));
+    Promise.all([
+      fetchESP8266Readings(),
+      api.get('/system/health').then(response => response.data),
+    ]).then(([readings, health]) => {
+      setTelemetry(readings);
+      setSystemHealth(health);
+    }).catch(() => {
+      setTelemetry([]);
+      setSystemHealth([]);
+    });
   }, []);
 
   const averageLatency = useMemo(() => {
@@ -32,7 +43,7 @@ export function ServerStatusPage() {
             Status of ESP32 surface sensor nodes, Wi-Fi telemetry pipelines, and AI computing layers
           </p>
         </div>
-        <span className="badge badge-ai">PROTOTYPE / DEMONSTRATION DATA</span>
+        <span className="badge badge-ai">MEASURED BACKEND STATUS</span>
       </div>
 
       <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
@@ -42,7 +53,7 @@ export function ServerStatusPage() {
           <span>Measured Pi inference latency: <strong>{averageLatency === null ? '—' : `${averageLatency.toFixed(1)} ms`}</strong></span>
           <span>Source: <strong>GET /api/v1/esp8266/latest</strong></span>
         </div>
-        <p className="text-xs text-muted" style={{ marginTop: 8 }}>Uptime, GIS latency, RSSI, battery, and coordinates are not claimed as live hardware measurements here.</p>
+        <p className="text-xs text-muted" style={{ marginTop: 8 }}>Values below are measured from persisted telemetry and backend health checks.</p>
       </div>
 
       {/* System Infrastructure Health Grid (Spec §41) */}
@@ -50,9 +61,11 @@ export function ServerStatusPage() {
         <div className="card-title" style={{ marginBottom: 10 }}>
           Core Infrastructure Subsystems
         </div>
-        <div className="card" style={{ background: 'var(--bg)' }}>
-          <div className="text-sm">Static subsystem latency and uptime claims were removed because the current hardware/backend does not measure them.</div>
-          <div className="text-xs text-muted" style={{ marginTop: 6 }}>Only measured Pi inference telemetry is shown above.</div>
+          <div className="card" style={{ background: 'var(--bg)' }}>
+          <div className="text-sm" style={{ display: 'grid', gap: 8 }}>
+            {systemHealth.map(service => <div key={service.name} className="flex items-center justify-between gap-md"><span>{service.name}</span><span className="text-xs text-muted">{service.status}{service.latency_ms != null ? ` · ${service.latency_ms.toFixed(2)} ms` : ''}</span></div>)}
+          </div>
+          {!systemHealth.length && <div className="text-xs text-muted">Backend health data unavailable.</div>}
         </div>
       </div>
 

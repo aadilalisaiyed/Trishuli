@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { io, Socket } from 'socket.io-client';
-import { ShieldAlert, Radio, Globe } from 'lucide-react';
+import { Radio, Globe } from 'lucide-react';
+import { fetchMineNodesApi } from '../services/nodesService';
 
-// Mock QGIS InSAR Risk Zone GeoJSON Polygon (Jharia / Dhanbad Coalfield Subsidence Zone)
+// Static demonstration overlay until a GIS/InSAR backend layer is available.
 const insarRiskZoneGeoJSON: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
   features: [
@@ -41,7 +41,7 @@ interface SensorAlertData {
 export function GISRealtimePage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const sensorMarkerRef = useRef<L.CircleMarker | null>(null);
+  const sensorMarkersRef = useRef<Record<string, L.CircleMarker>>({});
   const [socketConnected, setSocketConnected] = useState(false);
   const [latestAlert, setLatestAlert] = useState<SensorAlertData | null>(null);
 
@@ -128,27 +128,34 @@ export function GISRealtimePage() {
       },
     });
 
-    // Layer 3: Live IoT Sensors
+    // Layer 3: Live IoT Sensors, populated from the backend node records.
     const sensorsLayerGroup = L.layerGroup();
-    const sensorMarker = L.circleMarker([23.75, 86.41], {
-      radius: 10,
-      fillColor: '#10B981', // Green for Normal
-      color: '#047857',
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.85,
-    });
 
-    const initialPopupContent = `
-      <div style="font-family: sans-serif; font-size: 13px; min-width: 140px;">
-        <div style="font-weight: 700; color: #111827; margin-bottom: 4px;">Node ID: MESH-01</div>
-        <div><b>Status:</b> <span style="color: #10B981; font-weight: 600;">Normal</span></div>
-        <div><b>Displacement:</b> 0.0 mm</div>
-      </div>
-    `;
-    sensorMarker.bindPopup(initialPopupContent);
-    sensorsLayerGroup.addLayer(sensorMarker);
-    sensorMarkerRef.current = sensorMarker;
+    const renderNode = (node: any) => {
+      const reading = node.latest_reading;
+      const risk = reading?.risk_level || 'L0';
+      const isCritical = risk === 'L2' || risk === 'L3';
+      const color = isCritical ? '#DC2626' : risk === 'L1' ? '#F59E0B' : '#10B981';
+      const marker = sensorMarkersRef.current[node.id] || L.circleMarker([node.latitude, node.longitude], {
+        radius: 9, fillColor: color, color, weight: 2, opacity: 1, fillOpacity: 0.85,
+      });
+      marker.setLatLng([node.latitude, node.longitude]);
+      marker.setStyle({ fillColor: color, color });
+      marker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 13px; min-width: 160px;">
+          <div style="font-weight: 700; color: #111827; margin-bottom: 4px;">Node ID: ${node.id}</div>
+          <div><b>Status:</b> ${node.status}</div>
+          <div><b>Risk:</b> ${risk}</div>
+          <div><b>Displacement:</b> ${reading?.displacement ?? '—'} mm</div>
+        </div>
+      `);
+      if (!sensorMarkersRef.current[node.id]) {
+        sensorMarkersRef.current[node.id] = marker;
+        sensorsLayerGroup.addLayer(marker);
+      }
+    };
+
+    fetchMineNodesApi('PROTO-01').then(nodes => nodes.forEach(renderNode)).catch(err => console.warn('[GIS Nodes API]', err));
 
     // Add default overlays to map
     jharkhandLayer.addTo(map);
@@ -157,75 +164,43 @@ export function GISRealtimePage() {
 
     const overlayMaps = {
       'Jharkhand Districts': jharkhandLayer,
-      'QGIS InSAR Risk Zones': insarLayer,
+      'Demonstration InSAR Risk Zone': insarLayer,
       'Live IoT Sensors': sensorsLayerGroup,
     };
 
     // Add Layer Control menu in top right
     L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
 
-    // 4. WebSocket Integration
-    const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8000';
-    const socket: Socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
-    });
-
-    socket.on('connect', () => {
+    // 4. Native FastAPI WebSocket integration
+    const wsBase = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000/api/v1/ws';
+    const socket = new WebSocket(`${wsBase}/mines/PROTO-01/live`);
+    socket.onopen = () => {
       setSocketConnected(true);
-    });
-
-    socket.on('disconnect', () => {
+    };
+    socket.onclose = () => {
       setSocketConnected(false);
-    });
-
-    socket.on('sensor_alert', (data: SensorAlertData) => {
-      handleSensorAlert(data);
-    });
+    };
+    socket.onmessage = event => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'NODE_TICK') {
+          message.payload?.nodes?.forEach(renderNode);
+        }
+        if (message.type === 'NEW_ALERT' && message.payload?.alert) {
+          const alert = message.payload.alert;
+          setLatestAlert({ nodeId: alert.node_id, displacement: `${alert.predicted_deformation ?? 0} mm`, status: alert.severity, timestamp: alert.timestamp });
+        }
+      } catch (err) {
+        console.warn('[GIS WebSocket Message]', err);
+      }
+    };
 
     return () => {
-      socket.disconnect();
+      socket.close();
       map.remove();
       mapRef.current = null;
     };
   }, []);
-
-  const handleSensorAlert = (data: SensorAlertData) => {
-    setLatestAlert(data);
-    const marker = sensorMarkerRef.current;
-    if (marker) {
-      const isCritical = data.status.toUpperCase() !== 'NORMAL';
-      const color = isCritical ? '#EF4444' : '#10B981';
-      const borderColor = isCritical ? '#991B1B' : '#047857';
-
-      marker.setStyle({
-        fillColor: color,
-        color: borderColor,
-      });
-
-      const updatedPopupContent = `
-        <div style="font-family: sans-serif; font-size: 13px; min-width: 150px;">
-          <div style="font-weight: 700; color: #111827; margin-bottom: 4px;">Node ID: ${data.nodeId || 'MESH-01'}</div>
-          <div><b>Status:</b> <span style="color: ${color}; font-weight: 700;">${data.status}</span></div>
-          <div><b>Displacement:</b> <span style="font-weight: 600;">${data.displacement}</span></div>
-          ${data.timestamp ? `<div style="font-size: 11px; color: #6B7280; margin-top: 4px;">${data.timestamp}</div>` : ''}
-        </div>
-      `;
-      marker.setPopupContent(updatedPopupContent);
-      marker.openPopup();
-    }
-  };
-
-  // Helper trigger for testing real-time alert UI
-  const triggerTestAlert = () => {
-    const mockData: SensorAlertData = {
-      nodeId: 'MESH-01',
-      displacement: '18.4 mm',
-      status: 'CRITICAL',
-      timestamp: new Date().toLocaleTimeString(),
-    };
-    handleSensorAlert(mockData);
-  };
 
   return (
     <div className="flex flex-col h-full w-full p-4 gap-4" style={{ minHeight: 'calc(100vh - var(--header-height))' }}>
@@ -246,7 +221,7 @@ export function GISRealtimePage() {
               GIS Realtime Intelligence Map
             </h1>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Live Spatial Layers, Jharkhand District Boundaries, QGIS InSAR Risk Zones &amp; Realtime IoT Websocket Telemetry
+              Live node coordinates, demonstration InSAR overlay &amp; native FastAPI WebSocket telemetry
             </p>
           </div>
         </div>
@@ -262,14 +237,6 @@ export function GISRealtimePage() {
             </span>
           </div>
 
-          <button
-            onClick={triggerTestAlert}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md text-white transition-opacity hover:opacity-90"
-            style={{ background: 'var(--critical)' }}
-          >
-            <ShieldAlert size={14} />
-            Simulate Alert
-          </button>
         </div>
       </div>
 

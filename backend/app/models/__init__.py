@@ -8,6 +8,7 @@ from app.models.safe_zone import SafeZone
 from app.models.evacuation_route import EvacuationRoute
 from app.models.alert import Alert
 from app.models.notification import Notification
+from app.models.esp8266_telemetry import ESP8266Telemetry
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "EvacuationRoute",
     "Alert",
     "Notification",
+    "ESP8266Telemetry",
 ]

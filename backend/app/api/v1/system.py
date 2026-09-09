@@ -6,11 +6,13 @@ from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.alert import Alert
+from app.models.esp8266_telemetry import ESP8266Telemetry
+from app.api.v1.esp8266 import connected_devices
 from app.schemas.system import ServiceHealthOut, SystemStatusOut
 
 router = APIRouter(prefix="/system", tags=["System Health"])
@@ -39,40 +41,43 @@ def get_system_health(
         db_status = "Degraded"
         db_latency = 999.0
 
+    latest_telemetry = db.query(ESP8266Telemetry).order_by(ESP8266Telemetry.received_at.desc()).first()
+    telemetry_count = db.query(ESP8266Telemetry).count()
+    avg_model_latency = db.query(func.avg(ESP8266Telemetry.latency_ms)).scalar()
     return [
         ServiceHealthOut(
             name="Telemetry Data Ingestion Pipeline",
             status="Healthy",
-            latency_ms=12.4,
-            uptime_pct=99.98,
+            latency_ms=round(float(avg_model_latency or 0.0), 2),
+            uptime_pct=None,
             last_check=now,
         ),
         ServiceHealthOut(
             name="Subsidence AI Inference Engine",
             status="Healthy",
-            latency_ms=28.1,
-            uptime_pct=99.95,
+            latency_ms=round(float(avg_model_latency or 0.0), 2),
+            uptime_pct=None,
             last_check=now,
         ),
         ServiceHealthOut(
-            name="PostgreSQL Relational Database",
+            name="SQLite Telemetry Database",
             status=db_status,
             latency_ms=db_latency,
-            uptime_pct=99.99,
+            uptime_pct=None,
             last_check=now,
         ),
         ServiceHealthOut(
             name="Real-Time Alert Dispatcher",
-            status="Healthy",
-            latency_ms=8.6,
-            uptime_pct=99.99,
+            status="Healthy" if latest_telemetry else "Degraded",
+            latency_ms=None,
+            uptime_pct=None,
             last_check=now,
         ),
         ServiceHealthOut(
             name="WebSocket Live Telemetry Stream",
-            status="Healthy",
-            latency_ms=15.0,
-            uptime_pct=99.92,
+            status="Healthy" if connected_devices else "Degraded",
+            latency_ms=None,
+            uptime_pct=None,
             last_check=now,
         ),
     ]

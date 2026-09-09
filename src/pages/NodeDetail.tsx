@@ -2,7 +2,7 @@
 // MineSafe AI — Node Detail Page (Screen 6)
 // ============================================================
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   MapPin,
@@ -23,8 +23,6 @@ import {
 import { AIExplanation, RecommendationCard } from '../components/ai';
 import { fetchNodeHistoryApi, fetchNodeAIAssessmentApi } from '../services/nodesService';
 import type { NodeHistory, AIRiskAssessment } from '../types';
-import { generateNodeHistory } from '../data/historicalData';
-import { getRiskPrediction, getRecommendedActions } from '../services/aiService';
 import { formatDistanceToNowStrict } from 'date-fns';
 
 export function NodeDetailPage() {
@@ -36,20 +34,10 @@ export function NodeDetailPage() {
   const [realHistory, setRealHistory] = useState<NodeHistory | null>(null);
   const [realAiAssessment, setRealAiAssessment] = useState<AIRiskAssessment | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [apiError, setApiError] = useState(false);
 
   // Find target node from state
   const node = state.nodes.find(n => n.id === nodeId) || state.nodes[0];
-
-  const hoursBack = useMemo(() => {
-    switch (timeRange) {
-      case '1H': return 1;
-      case '6H': return 6;
-      case '24H': return 24;
-      case '7D': return 168;
-      case '30D': return 720;
-      default: return 24;
-    }
-  }, [timeRange]);
 
   // Fetch real node history & AI assessment on mount / node / timerange change
   useEffect(() => {
@@ -66,9 +54,15 @@ export function NodeDetailPage() {
         if (isMounted) {
           setRealHistory(hist);
           setRealAiAssessment(ai);
+          setApiError(false);
         }
       } catch (err) {
-        console.warn('[Node Detail API Fallback] Using client-side simulation:', err);
+        console.warn('[Node Detail API] Failed to load backend data:', err);
+        if (isMounted) {
+          setRealHistory(null);
+          setRealAiAssessment(null);
+          setApiError(true);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -79,19 +73,12 @@ export function NodeDetailPage() {
     return () => { isMounted = false; };
   }, [node?.id, timeRange]);
 
-  // Fallback local history if API data is empty or loading
-  const fallbackHistory = useMemo(() => {
-    return generateNodeHistory(
-      node?.id || 'N03',
-      hoursBack,
-      60,
-      state.scenario.toLowerCase() as any
-    );
-  }, [node?.id, hoursBack, state.scenario]);
-
-  const activeHistory = realHistory || fallbackHistory;
-  const aiAssessment = realAiAssessment || getRiskPrediction(node);
-  const recommendedActions = realAiAssessment?.recommendedActions || getRecommendedActions(node);
+  const activeHistory = realHistory || {
+    nodeId: node?.id || '',
+    tilt: [], displacement: [], vibration: [], crackEvents: [],
+    relativeMovement: [], riskScore: [], predictedDeformation: [], actualDeformation: [],
+  };
+  const recommendedActions = realAiAssessment?.recommendedActions || [];
 
   if (!node) {
     return (
@@ -226,6 +213,7 @@ export function NodeDetailPage() {
       />
 
       {/* Time-Series Charts Grid */}
+      {apiError && <div className="card text-sm" style={{ color: 'var(--critical)' }}>Historical telemetry and AI assessment are unavailable from the backend. No simulated data is shown.</div>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 'var(--sp-lg)' }}>
         {/* Predicted vs Actual Deformation */}
         <ChartCard
@@ -306,7 +294,7 @@ export function NodeDetailPage() {
 
       {/* AI Explainability & Recommended Safety Actions */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--sp-lg)' }}>
-        <AIExplanation assessment={aiAssessment} />
+        {realAiAssessment ? <AIExplanation assessment={realAiAssessment} /> : <div className="card text-sm text-muted">AI explanation unavailable until the backend returns an assessment.</div>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
           <RecommendationCard

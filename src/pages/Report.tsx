@@ -2,11 +2,11 @@
 // MineSafe AI — Safety Monitoring Reports (Screen 3)
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ReportBuilder, ReportPreview } from '../components/reports';
-import { generateReport, getDefaultReportSections } from '../services/reportService';
+import { generateReportApi, getDefaultReportSections } from '../services/reportService';
 import type { ReportData, ReportConfig } from '../types';
 
 export function ReportPage() {
@@ -15,7 +15,7 @@ export function ReportPage() {
   const urlNode = searchParams.get('node');
 
   // Initial report configuration
-  const defaultReport = useMemo<ReportData>(() => {
+  const defaultConfig = useMemo<ReportConfig>(() => {
     const now = new Date();
     const start = new Date(now.getTime() - 7 * 86400000);
     const config: ReportConfig = {
@@ -25,10 +25,23 @@ export function ReportPage() {
       region: 'Central Working Pit #4',
       sections: getDefaultReportSections(),
     };
-    return generateReport(config, state.nodes, state.alerts);
-  }, [state.nodes, state.alerts, urlNode]);
+    return config;
+  }, [urlNode]);
 
-  const [activeReport, setActiveReport] = useState<ReportData>(defaultReport);
+  const [activeReport, setActiveReport] = useState<ReportData | null>(null);
+  const [reportError, setReportError] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setReportError(false);
+    generateReportApi(defaultConfig)
+      .then(report => { if (mounted) setActiveReport(report); })
+      .catch(error => {
+        console.warn('[Initial Report API] Failed to load backend report:', error);
+        if (mounted) setReportError(true);
+      });
+    return () => { mounted = false; };
+  }, [defaultConfig]);
 
   return (
     <div style={{ padding: 'var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
@@ -45,17 +58,14 @@ export function ReportPage() {
       {/* Report Builder Form Section */}
       <ReportBuilder
         nodes={state.nodes}
-        alerts={state.alerts}
         initialNodeId={urlNode || 'ALL'}
         onReportGenerated={setActiveReport}
       />
 
+      {reportError && <div className="card text-sm" style={{ color: 'var(--critical)' }}>Backend report data is unavailable. No simulated report is shown.</div>}
+
       {/* Report Preview Document */}
-      <ReportPreview
-        report={activeReport}
-        nodes={state.nodes}
-        alerts={state.alerts}
-      />
+      {activeReport ? <ReportPreview report={activeReport} nodes={state.nodes} alerts={state.alerts} /> : !reportError && <div className="card text-sm text-muted">Loading report data from the backend...</div>}
     </div>
   );
 }

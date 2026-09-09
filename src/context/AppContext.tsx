@@ -10,6 +10,7 @@ import { loginApi, logoutApi, getCurrentUserApi, registerApi, type RegisterData 
 import { fetchMineNodesApi } from '../services/nodesService';
 import { fetchAlertsApi, acknowledgeAlertApi, resolveAlertApi } from '../services/alertService';
 import { mapBackendNodeToFrontend, mapBackendAlertToFrontend } from '../services/transformers';
+import { fetchNotificationsApi, markAllNotificationsReadApi, markNotificationReadApi } from '../services/notificationService';
 
 // --- State Interface ---
 interface AppState {
@@ -163,12 +164,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const reloadMineData = useCallback(async () => {
     try {
       dispatch({ type: 'SET_LOADING', loading: true });
-      const [nodes, alerts] = await Promise.all([
+      const [nodes, alerts, notifications] = await Promise.all([
         fetchMineNodesApi(config.mine.id),
         fetchAlertsApi(),
+        fetchNotificationsApi(),
       ]);
       dispatch({ type: 'SET_NODES', nodes });
       dispatch({ type: 'SET_ALERTS', alerts });
+      notifications.forEach(notification => dispatch({ type: 'ADD_NOTIFICATION', notification }));
     } catch (err) {
       console.error('[REST Error] Failed to fetch mine data:', err);
     } finally {
@@ -307,10 +310,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const markNotificationRead = useCallback((id: string) => {
+    markNotificationReadApi(id).catch(err => console.error('[Notification API Error]', err));
     dispatch({ type: 'MARK_NOTIFICATION_READ', id });
   }, []);
 
   const clearNotifications = useCallback(() => {
+    markAllNotificationsReadApi().catch(err => console.error('[Notification API Error]', err));
     dispatch({ type: 'CLEAR_NOTIFICATIONS' });
   }, []);
 

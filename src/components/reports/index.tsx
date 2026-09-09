@@ -10,7 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { ReportConfig, ReportData, NodeData, Alert } from '../../types';
-import { generateReport, generateReportApi, exportCSV, exportReportCsvApi, getDefaultReportSections } from '../../services/reportService';
+import { generateReportApi, exportCSV, exportReportCsvApi, getDefaultReportSections } from '../../services/reportService';
 import { RiskBadge } from '../common';
 import { format } from 'date-fns';
 import './report.css';
@@ -18,12 +18,10 @@ import './report.css';
 // --- Report Builder Form ---
 export function ReportBuilder({
   nodes,
-  alerts,
   initialNodeId,
   onReportGenerated,
 }: {
   nodes: NodeData[];
-  alerts: Alert[];
   initialNodeId?: string;
   onReportGenerated: (report: ReportData) => void;
 }) {
@@ -58,9 +56,8 @@ export function ReportBuilder({
       const report = await generateReportApi(reportConfig);
       onReportGenerated(report);
     } catch (err) {
-      console.warn('[Report API Fallback] Generating report locally:', err);
-      const fallbackReport = generateReport(reportConfig, nodes, alerts);
-      onReportGenerated(fallbackReport);
+      console.warn('[Report API] Failed to generate report from backend:', err);
+      window.alert('The backend report service is unavailable. No simulated report was generated.');
     } finally {
       setLoading(false);
     }

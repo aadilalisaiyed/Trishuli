@@ -46,12 +46,63 @@ export async function updateNodeThresholdsApi(
 export async function fetchNodeHistoryApi(
   nodeId: string,
   metric: string = 'all',
-  limit: number = 100
+  limit: number = 100,
+  from?: Date,
+  to?: Date,
 ): Promise<NodeHistory> {
   const response = await api.get(`/nodes/${nodeId}/history`, {
-    params: { metric, limit },
+    params: { metric, limit, from: from?.toISOString(), to: to?.toISOString() },
   });
   return mapBackendHistoryToFrontend(response.data);
+}
+
+export interface AnalyticsSummary {
+  avgTilt: number;
+  maxDisplacement: number;
+  peakVibration: number;
+  crackEventsTotal: number;
+  avgRiskScore: number;
+  aiPredictionAccuracy: number;
+}
+
+export interface RiskDistributionItem {
+  level: string;
+  percentage: number;
+  color: string;
+}
+
+export async function fetchAnalyticsSummaryApi(
+  mineId: string,
+  from?: Date,
+  to?: Date,
+): Promise<AnalyticsSummary> {
+  const response = await api.get(`/mines/${mineId}/analytics/summary`, {
+    params: { from: from?.toISOString(), to: to?.toISOString() },
+  });
+  const data = response.data;
+  return {
+    avgTilt: data.avg_tilt,
+    maxDisplacement: data.max_displacement,
+    peakVibration: data.peak_vibration,
+    crackEventsTotal: data.crack_events_total,
+    avgRiskScore: data.avg_risk_score,
+    aiPredictionAccuracy: data.ai_prediction_accuracy,
+  };
+}
+
+export async function fetchRiskDistributionApi(
+  mineId: string,
+  from?: Date,
+  to?: Date,
+): Promise<RiskDistributionItem[]> {
+  const response = await api.get(`/mines/${mineId}/analytics/risk-distribution`, {
+    params: { from: from?.toISOString(), to: to?.toISOString() },
+  });
+  return (response.data?.distribution || []).map((item: any) => ({
+    level: item.level,
+    percentage: item.percentage,
+    color: item.color,
+  }));
 }
 
 /**
