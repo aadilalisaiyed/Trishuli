@@ -2,7 +2,7 @@
 // MineSafe AI — Server & Infrastructure Status (Screen 4)
 // ============================================================
 
-import { Wifi, Clock, Battery, Activity, Radio } from 'lucide-react';
+import { Wifi, Clock, Battery, Radio } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { StatusBadge } from '../components/common';

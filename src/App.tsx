@@ -14,6 +14,7 @@ import { ServerStatusPage } from './pages/ServerStatus';
 import { AlertsPage } from './pages/Alerts';
 import { NodeDetailPage } from './pages/NodeDetail';
 import { ESP8266LivePage } from './pages/ESP8266Live';
+import { GISRealtimePage } from './pages/GISRealtime';
 
 // Protected Route Guard
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -78,6 +79,15 @@ export function App() {
           <Route
             path="/map"
             element={<Navigate to="/dashboard" replace />}
+          />
+
+          <Route
+            path="/gis-realtime"
+            element={
+              <ProtectedRoute>
+                <GISRealtimePage />
+              </ProtectedRoute>
+            }
           />
 
           <Route

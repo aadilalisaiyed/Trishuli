@@ -6,16 +6,16 @@ import type { MapProvider } from '../types';
 
 export const config = {
   app: {
-    name: 'MineSafe AI',
+    name: 'MINESAFE AI',
     tagline: 'Real-Time Mine Subsidence Intelligence & Early Warning',
-    version: '1.0.0-prototype',
+    version: '1.0.0',
   },
 
   mine: {
     id: 'PROTO-01',
-    name: 'Prototype Mine',
-    location: 'Demonstration Site, Jharkhand, India',
-    fullName: 'Prototype Mine — Demonstration Site, Jharkhand, India',
+    name: 'Mine Site',
+    location: 'Jharkhand, India',
+    fullName: 'Mine Site — Jharkhand, India',
     // Center point near Dhanbad, Jharkhand — India's coal capital
     latitude: 23.7945,
     longitude: 86.4305,

@@ -1,23 +1,56 @@
 // ============================================================
-// MineSafe AI — Layout Components
+// Khanraksh — Layout Components
 // ============================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Map, BarChart3, FileText, Server, AlertTriangle,
-  Bell, LogOut, Menu, X, Shield, ChevronDown, Activity, Radio
+  Bell, LogOut, Menu, X, Activity, Radio, Sun, Moon, Globe
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { config } from '../../config';
 import { formatDistanceToNowStrict } from 'date-fns';
 import './layout.css';
 
+// --- Role display name mapping ---
+const roleDisplayNames: Record<string, string> = {
+  'Safety Officer': 'Safety Officer',
+  'Geotechnical Engineer': 'Geotech Engineer',
+  'Mine Manager': 'Mine Manager',
+  'GIS Analyst': 'GIS Analyst',
+  'DGMS Inspector': 'DGMS Inspector',
+  'admin': 'Administrator',
+};
+
+function getUserDisplayName(user: { name: string; role: string; username: string } | null): string {
+  if (!user) return 'Guest';
+  if (user.name && user.name !== 'demo' && user.name.toLowerCase() !== 'demo demo') return user.name;
+  return roleDisplayNames[user.role] || user.role || user.username;
+}
+
+// --- Dark Mode Hook ---
+function useDarkMode(): [boolean, () => void] {
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('khanraksh_theme');
+    return saved === 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('khanraksh_theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
+
+  const toggle = () => setIsDark(prev => !prev);
+  return [isDark, toggle];
+}
+
 // --- Header ---
 export function Header() {
   const { state, logout, clearNotifications, markNotificationRead } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const [isDark, toggleDark] = useDarkMode();
   const navigate = useNavigate();
 
   const unreadCount = state.notifications.filter(n => !n.read).length;
@@ -35,12 +68,8 @@ export function Header() {
             {showMobileNav ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="header-brand">
-            <Shield size={20} color="var(--primary)" />
+            <img src="/logo.png" alt="MINESAFE AI" className="brand-logo" style={{ width: 34, height: 34, objectFit: 'contain' }} />
             <span className="header-title">{config.app.name}</span>
-          </div>
-          <div className="header-divider" />
-          <div className="header-meta">
-            <span className="text-xs text-secondary">{config.mine.name} — India</span>
           </div>
         </div>
 
@@ -61,6 +90,17 @@ export function Header() {
               {activeAlerts} alert{activeAlerts !== 1 ? 's' : ''}
             </span>
           </div>
+          <div className="header-divider" />
+
+          {/* Dark Mode Toggle */}
+          <button
+            className="btn-icon theme-toggle"
+            onClick={toggleDark}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? <Sun size={18} color="var(--text-secondary)" /> : <Moon size={18} color="var(--text-secondary)" />}
+          </button>
           <div className="header-divider" />
 
           {/* Notification Bell */}
@@ -86,7 +126,7 @@ export function Header() {
 
           <div className="header-divider" />
           <div className="header-user">
-            <span className="text-xs text-secondary">{state.user?.name || 'Guest'}</span>
+            <span className="text-xs text-secondary">{getUserDisplayName(state.user)}</span>
             <button className="btn-icon" onClick={logout} aria-label="Log out" title="Log out">
               <LogOut size={16} color="var(--text-muted)" />
             </button>
@@ -165,9 +205,6 @@ export function Sidebar() {
       <nav className="sidebar-nav">
         <NavigationLinks />
       </nav>
-      <div className="sidebar-footer">
-        <DemoScenarioControl />
-      </div>
     </aside>
   );
 }
@@ -176,11 +213,12 @@ export function Sidebar() {
 function NavigationLinks({ onClick }: { onClick?: () => void }) {
   const navItems = [
     { to: '/dashboard', icon: <Map size={18} />, label: 'Node Live Map' },
+    { to: '/gis-realtime', icon: <Globe size={18} />, label: 'GIS Realtime' },
     { to: '/analytics', icon: <BarChart3 size={18} />, label: 'Analytics' },
     { to: '/report', icon: <FileText size={18} />, label: 'Report' },
     { to: '/server', icon: <Server size={18} />, label: 'Server Status' },
     { to: '/alerts', icon: <AlertTriangle size={18} />, label: 'Alerts' },
-    { to: '/esp8266', icon: <Radio size={18} />, label: 'ESP8266 Live' },
+    { to: '/esp8266', icon: <Radio size={18} />, label: 'Nodes' },
   ];
 
   return (
@@ -197,43 +235,6 @@ function NavigationLinks({ onClick }: { onClick?: () => void }) {
         </NavLink>
       ))}
     </>
-  );
-}
-
-// --- Demo Scenario Control ---
-function DemoScenarioControl() {
-  const { state, setScenario } = useApp();
-  const [open, setOpen] = useState(false);
-
-  const scenarios = [
-    { value: 'NORMAL' as const, label: 'Normal', color: 'var(--success)' },
-    { value: 'WARNING' as const, label: 'Warning', color: 'var(--warning)' },
-    { value: 'CRITICAL' as const, label: 'Critical', color: 'var(--critical)' },
-  ];
-
-  return (
-    <div className="demo-control">
-      <button className="demo-control-btn" onClick={() => setOpen(!open)}>
-        <span className="text-xs" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>DEMO</span>
-        <ChevronDown size={14} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-      </button>
-      {open && (
-        <div className="demo-control-options animate-slide-up">
-          {scenarios.map(s => (
-            <button
-              key={s.value}
-              className={`demo-option ${state.scenario === s.value ? 'active' : ''}`}
-              onClick={() => { setScenario(s.value); }}
-              style={state.scenario === s.value ? { borderColor: s.color, background: `${s.color}10` } : undefined}
-            >
-              <span className="status-dot" style={{ background: s.color }} />
-              <span className="text-xs">{s.label}</span>
-            </button>
-          ))}
-          <div className="text-xs text-muted" style={{ padding: '4px 8px' }}>Demo scenario control</div>
-        </div>
-      )}
-    </div>
   );
 }
 

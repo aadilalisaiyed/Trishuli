@@ -22,9 +22,20 @@ router = APIRouter(prefix="/esp8266", tags=["ESP8266 Telemetry"])
 latest_readings: Dict[str, ESP8266Assessment] = {}
 
 
+class NodeRegisterRequest(BaseModel):
+    node_id: str
+
+registered_nodes: set[str] = set()
+
 @router.api_route("/latest", methods=["GET", "POST"])
 def latest_readings_endpoint(request: Request, payload: ESP8266Assessment | None = None) -> List[ESP8266Assessment] | ESP8266Assessment:
     if request.method == "POST" and payload is not None:
         latest_readings[payload.device] = payload
         return payload
     return list(latest_readings.values())
+
+
+@router.post("/nodes")
+def register_node(payload: NodeRegisterRequest):
+    registered_nodes.add(payload.node_id)
+    return {"status": "success", "node_id": payload.node_id, "registered_nodes": list(registered_nodes)}

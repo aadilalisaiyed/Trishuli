@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, Radio, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, Radio, XCircle, Plus, X } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
-import { fetchESP8266Readings, type ESP8266Reading } from '../services/esp8266Service';
+import { fetchESP8266Readings, addNode, type ESP8266Reading } from '../services/esp8266Service';
 
 const riskColors: Record<string, string> = {
   normal: 'var(--success)',
@@ -50,12 +50,91 @@ function BooleanStatus({ label, value, positiveIsGood }: { label: string; value:
   );
 }
 
+// --- Add Node Modal ---
+function AddNodeModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (nodeId: string) => void }) {
+  const [nodeId, setNodeId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nodeId.trim()) {
+      setError('Please enter a Node ID.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await onSubmit(nodeId.trim());
+      onClose();
+    } catch {
+      setError('Failed to add node. Check your connection.');
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+    }}
+      onClick={onClose}
+    >
+      <div
+        className="card animate-fade-in"
+        style={{ width: 400, maxWidth: '90vw', padding: 'var(--sp-xl)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between" style={{ marginBottom: 'var(--sp-lg)' }}>
+          <h3 style={{ fontWeight: 700, fontSize: '1.1rem' }}>Add New Node</h3>
+          <button className="btn-icon" onClick={onClose}>
+            <X size={18} color="var(--text-muted)" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-md)' }}>
+          <div className="form-group">
+            <label className="form-label">Node ID</label>
+            <input
+              type="text"
+              className="form-input"
+              style={{ width: '100%' }}
+              value={nodeId}
+              onChange={e => setNodeId(e.target.value)}
+              placeholder="e.g. ESP_001 or sensor-node-5"
+              autoFocus
+              required
+            />
+          </div>
+
+          {error && (
+            <div className="text-xs" style={{ color: 'var(--critical)' }}>{error}</div>
+          )}
+
+          <div className="flex items-center gap-sm" style={{ justifyContent: 'flex-end', marginTop: 'var(--sp-sm)' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? 'Adding...' : 'Add Node'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function ESP8266LivePage() {
   const [readings, setReadings] = useState<ESP8266Reading[]>([]);
   const [error, setError] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const deviceTiming = useRef<Record<string, DeviceTiming>>({});
   const [, refreshCadence] = useState(0);
+  const [showAddNode, setShowAddNode] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -127,16 +206,28 @@ export function ESP8266LivePage() {
   }, {});
   const activeEscalations = liveReadings.filter(reading => ['warning', 'critical'].includes(riskKey(reading.risk).toLowerCase()));
 
+  const handleAddNode = async (nodeId: string) => {
+    await addNode(nodeId);
+  };
+
   return (
     <div style={{ padding: 'var(--sp-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-lg)' }}>
       <div className="flex items-center justify-between flex-wrap gap-md">
         <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>ESP8266 Live Telemetry</h1>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Nodes Data</h1>
           <p className="text-xs text-muted">ML assessments received through the Raspberry Pi gateway</p>
         </div>
         <div className="flex items-center gap-md">
           <span className="text-xs text-muted">Last data received: {latestReceivedAt ? formatDistanceToNowStrict(latestReceivedAt, { addSuffix: true }) : '—'}</span>
           <span className="badge badge-ai"><Radio size={13} /> LIVE POLL</span>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowAddNode(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <Plus size={14} />
+            Add Node
+          </button>
         </div>
       </div>
 
@@ -151,7 +242,7 @@ export function ESP8266LivePage() {
       {readings.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 40 }}>
           <Activity size={24} color="var(--text-muted)" />
-          <div className="text-sm text-muted" style={{ marginTop: 10 }}>Waiting for the first ESP8266 sample...</div>
+          <div className="text-sm text-muted" style={{ marginTop: 10 }}>Waiting for the first node sample...</div>
         </div>
       ) : (
         <>
@@ -222,6 +313,13 @@ export function ESP8266LivePage() {
           ))}
           </div>
         </>
+      )}
+
+      {showAddNode && (
+        <AddNodeModal
+          onClose={() => setShowAddNode(false)}
+          onSubmit={handleAddNode}
+        />
       )}
     </div>
   );

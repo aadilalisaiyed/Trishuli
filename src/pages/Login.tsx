@@ -1,10 +1,10 @@
 // ============================================================
-// MineSafe AI — Authentication Portal (Login & Registration)
+// Khanraksh — Authentication Portal (Login & Registration)
 // ============================================================
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Lock, User as UserIcon, AlertCircle, ArrowRight, Activity, Radio, Cpu, UserPlus, CheckCircle } from 'lucide-react';
+import { Lock, User as UserIcon, AlertCircle, ArrowRight, Activity, Radio, Cpu, UserPlus, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { config } from '../config';
 
@@ -22,16 +22,18 @@ export function LoginPage({ initialMode }: LoginProps) {
   const [mode, setMode] = useState<'login' | 'register'>(isRegisterRoute ? 'register' : 'login');
 
   // Login Form States
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('minesafe2026');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register Form States
   const [regFullName, setRegFullName] = useState('');
   const [regUsername, setRegUsername] = useState('');
-  const [regRole, setRegRole] = useState('Safety Officer');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
 
   // Status & Feedback
   const [error, setError] = useState('');
@@ -61,7 +63,7 @@ export function LoginPage({ initialMode }: LoginProps) {
         setLoading(false);
       }
     } catch {
-      setError('Authentication error. Unable to connect to MineSafe backend.');
+      setError('Authentication error. Unable to connect to backend.');
       setLoading(false);
     }
   };
@@ -95,7 +97,7 @@ export function LoginPage({ initialMode }: LoginProps) {
         name: regFullName.trim(),
         username: regUsername.trim(),
         password: regPassword,
-        role: regRole,
+        role: 'DGMS Inspector',
       });
       setSuccessMsg('Account registered successfully! Redirecting...');
       setTimeout(() => {
@@ -113,8 +115,8 @@ export function LoginPage({ initialMode }: LoginProps) {
     <div style={{
       minHeight: '100vh',
       display: 'flex',
-      background: '#F8FAFC',
-      color: '#111827',
+      background: 'var(--bg)',
+      color: 'var(--text-primary)',
       fontFamily: 'var(--font-sans)',
     }}>
       {/* Left Branding Panel */}
@@ -140,17 +142,7 @@ export function LoginPage({ initialMode }: LoginProps) {
 
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div className="flex items-center gap-sm" style={{ marginBottom: 32 }}>
-            <div style={{
-              background: 'var(--primary)',
-              width: 38,
-              height: 38,
-              borderRadius: 'var(--r-md)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Shield size={22} color="white" />
-            </div>
+            <img src="/logo.png" alt="MINESAFE AI" style={{ width: 44, height: 44, objectFit: 'contain', filter: 'invert(1)' }} />
             <div>
               <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
                 {config.app.name}
@@ -193,7 +185,7 @@ export function LoginPage({ initialMode }: LoginProps) {
 
         <div style={{ position: 'relative', zIndex: 1, paddingTop: 32, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           <div className="text-xs" style={{ color: '#64748B' }}>
-            Prototype Demonstration Site — Jharkhand, India &bull; Compliant with DGMS Safety Intelligence Guidelines
+            Compliant with DGMS Safety Intelligence Guidelines
           </div>
         </div>
       </div>
@@ -210,7 +202,7 @@ export function LoginPage({ initialMode }: LoginProps) {
           {/* Top Auth Mode Tabs */}
           <div style={{
             display: 'flex',
-            background: '#F1F5F9',
+            background: 'var(--card-hover)',
             borderRadius: 'var(--r-md)',
             padding: 4,
             marginBottom: 28,
@@ -223,7 +215,7 @@ export function LoginPage({ initialMode }: LoginProps) {
                 padding: '8px 16px',
                 border: 'none',
                 borderRadius: 'var(--r-sm)',
-                background: mode === 'login' ? '#FFFFFF' : 'transparent',
+                background: mode === 'login' ? 'var(--card)' : 'transparent',
                 color: mode === 'login' ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: mode === 'login' ? 700 : 500,
                 fontSize: '0.875rem',
@@ -242,7 +234,7 @@ export function LoginPage({ initialMode }: LoginProps) {
                 padding: '8px 16px',
                 border: 'none',
                 borderRadius: 'var(--r-sm)',
-                background: mode === 'register' ? '#FFFFFF' : 'transparent',
+                background: mode === 'register' ? 'var(--card)' : 'transparent',
                 color: mode === 'register' ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: mode === 'register' ? 700 : 500,
                 fontSize: '0.875rem',
@@ -257,7 +249,7 @@ export function LoginPage({ initialMode }: LoginProps) {
 
           <div style={{ marginBottom: 24 }}>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 6 }}>
-              {mode === 'login' ? 'Sign In to Portal' : 'Register Safety Officer Profile'}
+              {mode === 'login' ? 'Sign In to Portal' : 'Register DGMS Inspector Profile'}
             </h2>
             <p className="text-sm text-secondary">
               {mode === 'login'
@@ -286,11 +278,11 @@ export function LoginPage({ initialMode }: LoginProps) {
 
           {successMsg && (
             <div style={{
-              background: 'var(--normal-bg)',
-              border: '1px solid var(--normal-light)',
+              background: 'var(--success-bg)',
+              border: '1px solid var(--success-light)',
               borderRadius: 'var(--r-md)',
               padding: '10px 14px',
-              color: 'var(--normal)',
+              color: 'var(--success)',
               fontSize: '0.8125rem',
               display: 'flex',
               alignItems: 'center',
@@ -314,7 +306,7 @@ export function LoginPage({ initialMode }: LoginProps) {
                     style={{ width: '100%', paddingLeft: 36 }}
                     value={username}
                     onChange={e => setUsername(e.target.value)}
-                    placeholder="e.g. admin"
+                    placeholder="Enter your username"
                     required
                   />
                   <UserIcon size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 11 }} />
@@ -325,15 +317,39 @@ export function LoginPage({ initialMode }: LoginProps) {
                 <label className="form-label">Security Password</label>
                 <div style={{ position: 'relative' }}>
                   <input
-                    type="password"
+                    type={showLoginPassword ? 'text' : 'password'}
                     className="form-input"
-                    style={{ width: '100%', paddingLeft: 36 }}
+                    style={{ width: '100%', paddingLeft: 36, paddingRight: 40 }}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••••••"
                     required
                   />
                   <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 11 }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: 6,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 4,
+                      borderRadius: 'var(--r-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    title={showLoginPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showLoginPassword
+                      ? <EyeOff size={16} color="var(--text-muted)" />
+                      : <Eye size={16} color="var(--text-muted)" />
+                    }
+                  </button>
                 </div>
               </div>
 
@@ -346,7 +362,6 @@ export function LoginPage({ initialMode }: LoginProps) {
                   />
                   <span className="text-xs text-secondary">Remember this session</span>
                 </label>
-                <span className="text-xs text-muted">Backend Integrated</span>
               </div>
 
               <button
@@ -399,34 +414,42 @@ export function LoginPage({ initialMode }: LoginProps) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Official Role</label>
-                <select
-                  className="form-select"
-                  value={regRole}
-                  onChange={e => setRegRole(e.target.value)}
-                  style={{ width: '100%' }}
-                >
-                  <option value="Safety Officer">Safety Officer</option>
-                  <option value="Geotechnical Engineer">Geotechnical Engineer</option>
-                  <option value="Mine Manager">Mine Manager</option>
-                  <option value="GIS Analyst">GIS / Subsidence Analyst</option>
-                  <option value="DGMS Inspector">DGMS Inspector / Regulator</option>
-                </select>
-              </div>
-
-              <div className="form-group">
                 <label className="form-label">Security Password (min 6 chars)</label>
                 <div style={{ position: 'relative' }}>
                   <input
-                    type="password"
+                    type={showRegPassword ? 'text' : 'password'}
                     className="form-input"
-                    style={{ width: '100%', paddingLeft: 36 }}
+                    style={{ width: '100%', paddingLeft: 36, paddingRight: 40 }}
                     value={regPassword}
                     onChange={e => setRegPassword(e.target.value)}
                     placeholder="••••••••••••"
                     required
                   />
                   <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 11 }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: 6,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 4,
+                      borderRadius: 'var(--r-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                    title={showRegPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showRegPassword
+                      ? <EyeOff size={16} color="var(--text-muted)" />
+                      : <Eye size={16} color="var(--text-muted)" />
+                    }
+                  </button>
                 </div>
               </div>
 
@@ -434,15 +457,39 @@ export function LoginPage({ initialMode }: LoginProps) {
                 <label className="form-label">Confirm Password</label>
                 <div style={{ position: 'relative' }}>
                   <input
-                    type="password"
+                    type={showRegConfirmPassword ? 'text' : 'password'}
                     className="form-input"
-                    style={{ width: '100%', paddingLeft: 36 }}
+                    style={{ width: '100%', paddingLeft: 36, paddingRight: 40 }}
                     value={regConfirmPassword}
                     onChange={e => setRegConfirmPassword(e.target.value)}
                     placeholder="••••••••••••"
                     required
                   />
                   <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 12, top: 11 }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: 6,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 4,
+                      borderRadius: 'var(--r-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    aria-label={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                    title={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showRegConfirmPassword
+                      ? <EyeOff size={16} color="var(--text-muted)" />
+                      : <Eye size={16} color="var(--text-muted)" />
+                    }
+                  </button>
                 </div>
               </div>
 
@@ -460,57 +507,6 @@ export function LoginPage({ initialMode }: LoginProps) {
                 )}
               </button>
             </form>
-          )}
-
-          {/* Credentials Box for Quick Reference in Login mode */}
-          {mode === 'login' && (
-            <div style={{
-              marginTop: 24,
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--r-md)',
-              padding: '12px 14px',
-            }}>
-              <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-                <span className="text-xs" style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
-                  SAMPLE ROLE CREDENTIALS:
-                </span>
-                <span className="text-xs text-muted" style={{ fontSize: '0.7rem' }}>Click to autofill</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {[
-                  { role: 'Safety Officer', user: 'admin', pass: 'minesafe2026' },
-                  { role: 'Geotech Engineer', user: 'geotech', pass: 'minesafe2026' },
-                  { role: 'Mine Manager', user: 'manager', pass: 'minesafe2026' },
-                  { role: 'DGMS Inspector', user: 'inspector', pass: 'minesafe2026' },
-                ].map(c => (
-                  <button
-                    key={c.user}
-                    type="button"
-                    onClick={() => { setUsername(c.user); setPassword(c.pass); setError(''); }}
-                    style={{
-                      background: username === c.user ? 'var(--primary-bg, #EFF6FF)' : '#FFFFFF',
-                      border: `1px solid ${username === c.user ? 'var(--primary)' : 'var(--border)'}`,
-                      borderRadius: 'var(--r-sm)',
-                      padding: '6px 8px',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 2,
-                    }}
-                  >
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: username === c.user ? 'var(--primary)' : 'var(--text-primary)' }}>
-                      {c.role}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      ID: <code>{c.user}</code>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
           )}
 
           {/* Bottom Switcher */}
