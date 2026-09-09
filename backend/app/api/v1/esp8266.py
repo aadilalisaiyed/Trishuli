@@ -7,7 +7,7 @@ from typing import Dict, List
 
 import joblib
 import numpy as np
-from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -36,6 +36,17 @@ class ESP8266Assessment(BaseModel):
     corroboration_count: int = 0
     gate_branch: str = ""
     gate_trace: str = ""
+
+
+class ESP8266IngestAck(BaseModel):
+    """Compact response for constrained ESP clients."""
+    device: str
+    risk: str
+    confidence: float
+    is_anomaly: bool
+    latency_ms: float
+    samples_received: int
+    received_at: datetime
 
 
 class ESP8266RawReading(BaseModel):
@@ -333,10 +344,25 @@ def get_latest_readings(db: Session = Depends(get_db)) -> List[ESP8266Assessment
     return [_assessment_from_row(row) for row in latest_by_device.values()]
 
 
-@router.post("/latest", response_model=ESP8266Assessment)
-def ingest_reading(payload: ESP8266RawReading, db: Session = Depends(get_db)) -> ESP8266Assessment:
+@router.post("/latest", response_model=ESP8266IngestAck)
+def ingest_reading(
+    payload: ESP8266RawReading,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> ESP8266IngestAck:
+    # ESP8266 clients commonly reuse sockets longer than the server keep-alive window.
+    # Explicit close prevents a stale keep-alive connection from producing HTTP -1.
+    response.headers["Connection"] = "close"
     result = _store_result(payload, db)
-    return result
+    return ESP8266IngestAck(
+        device=result.device,
+        risk=result.risk,
+        confidence=result.confidence,
+        is_anomaly=result.is_anomaly,
+        latency_ms=result.latency_ms,
+        samples_received=result.samples_received,
+        received_at=result.received_at,
+    )
 
 
 @router.websocket("/ws/{device_id}")
@@ -351,7 +377,15 @@ async def esp8266_websocket(websocket: WebSocket, device_id: str, db: Session = 
                 message.setdefault("device", device_id)
                 payload = ESP8266RawReading.model_validate(message)
                 result = _store_result(payload, db)
-                await websocket.send_json({"type": "telemetry_ack", "payload": result.model_dump(mode="json")})
+                await websocket.send_json({"type": "telemetry_ack", "payload": ESP8266IngestAck(
+                    device=result.device,
+                    risk=result.risk,
+                    confidence=result.confidence,
+                    is_anomaly=result.is_anomaly,
+                    latency_ms=result.latency_ms,
+                    samples_received=result.samples_received,
+                    received_at=result.received_at,
+                ).model_dump(mode="json")})
             except WebSocketDisconnect:
                 raise
             except Exception as exc:
