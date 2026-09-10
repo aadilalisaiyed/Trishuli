@@ -1,0 +1,270 @@
+{
+  "name": "MineSafe Daily Role-Based Reports",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 15 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily 3 PM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "filePath": "/data/mails.xlsx"
+      },
+      "id": "read-mail-directory",
+      "name": "Read Recipient Workbook",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "id": "spreadsheet-extractor",
+      "name": "Spreadsheet Extractor",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const roleSections = {\n  'safety officer': ['executive-summary', 'risk-overview', 'affected-zones', 'sensor-statistics', 'major-alerts', 'ai-predictions', 'node-health', 'trend-analysis', 'recommended-actions'],\n  'dgms inspector': ['executive-summary', 'risk-overview', 'affected-zones', 'sensor-statistics', 'major-alerts', 'ai-predictions', 'node-health', 'trend-analysis', 'recommended-actions'],\n  'geotech engineer': ['executive-summary', 'risk-overview', 'sensor-statistics', 'ai-predictions', 'trend-analysis'],\n  'mine manager': ['executive-summary', 'risk-overview', 'affected-zones', 'major-alerts', 'recommended-actions']\n};\n\nconst labels = {\n  'executive-summary': 'Executive Summary',\n  'risk-overview': 'Risk Overview',\n  'affected-zones': 'Affected Zones',\n  'sensor-statistics': 'Sensor Statistics',\n  'major-alerts': 'Major Alerts',\n  'ai-predictions': 'AI Predictions',\n  'node-health': 'Node Health',\n  'trend-analysis': 'Trend Analysis',\n  'recommended-actions': 'Recommended Actions'\n};\n\nconst reportDate = $now.setZone('Asia/Kolkata');\nconst start = reportDate.startOf('day').toUTC().toISO();\nconst end = reportDate.endOf('day').toUTC().toISO();\n\nreturn $input.all()\n  .map(({ json: row }) => {\n    const email = String(row.Email ?? row.email ?? '').trim();\n    const role = String(row.Roles ?? row.Role ?? row.role ?? '').trim();\n    const roleKey = role.toLowerCase();\n    const sectionIds = roleSections[roleKey] ?? ['executive-summary', 'risk-overview', 'major-alerts'];\n\n    if (!email) return null;\n\n    return {\n      json: {\n        recipientId: row.ID ?? row.id ?? '',\n        email,\n        phone: row['Phone No'] ?? row.phone ?? '',\n        role: role || 'Other',\n        reportConfig: {\n          mine: 'Prototype Mine',\n          date_range: { start, end },\n          node_scope: ['ALL'],\n          region: '',\n          sections: sectionIds.map((id) => ({ id, label: labels[id] ?? id, enabled: true }))\n        }\n      }\n    };\n  })\n  .filter(Boolean);"
+      },
+      "id": "map-role-sections",
+      "name": "Map Role And Sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/reports/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.MINESAFE_API_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.reportConfig) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "generate-report",
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().map((item) => {\n  const recipient = $('Map Role And Sections').item.json;\n  return {\n    json: {\n      ...recipient,\n      report: item.json,\n      summary: item.json.summary ?? '',\n      riskOverview: item.json.risk_overview ?? {},\n      reportConfig: recipient.reportConfig\n    }\n  };\n});"
+      },
+      "id": "prepare-csv-request",
+      "name": "Prepare CSV Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/reports/export/csv",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.MINESAFE_API_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.reportConfig) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data",
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "export-report-csv",
+      "name": "Export Report CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.MINESAFE_REPORT_FROM_EMAIL }}",
+        "toEmail": "={{ $('Prepare CSV Request').item.json.email }}",
+        "subject": "={{ 'MineSafe Daily Report - ' + $('Prepare CSV Request').item.json.role }}",
+        "emailType": "html",
+        "html": "={{ '<h2>MineSafe Daily Safety Report</h2>' + '<p>Recipient role: <strong>' + $('Prepare CSV Request').item.json.role + '</strong></p>' + '<p>' + $('Prepare CSV Request').item.json.summary + '</p>' + '<h3>Risk Overview</h3>' + '<ul><li>Overall risk: <strong>' + ($('Prepare CSV Request').item.json.riskOverview.overall_risk ?? 'N/A') + '</strong></li><li>L0: ' + ($('Prepare CSV Request').item.json.riskOverview.l0_percentage ?? 0) + '%</li><li>L1: ' + ($('Prepare CSV Request').item.json.riskOverview.l1_percentage ?? 0) + '%</li><li>L2: ' + ($('Prepare CSV Request').item.json.riskOverview.l2_percentage ?? 0) + '%</li><li>L3: ' + ($('Prepare CSV Request').item.json.riskOverview.l3_percentage ?? 0) + '%</li><li>Alerts: ' + ($('Prepare CSV Request').item.json.report.alerts?.length ?? 0) + '</li><li>Nodes: ' + ($('Prepare CSV Request').item.json.report.node_statistics?.length ?? 0) + '</li></ul><p>The detailed telemetry CSV is attached.</p>' }}",
+        "attachments": "data"
+      },
+      "id": "deliver-report-email",
+      "name": "Email Daily Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1820,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 3 PM IST": {
+      "main": [
+        [
+          {
+            "node": "Read Recipient Workbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Recipient Workbook": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spreadsheet Extractor": {
+      "main": [
+        [
+          {
+            "node": "Map Role And Sections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Role And Sections": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Prepare CSV Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CSV Request": {
+      "main": [
+        [
+          {
+            "node": "Export Report CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Report CSV": {
+      "main": [
+        [
+          {
+            "node": "Email Daily Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "versionId": "minesafe-daily-role-reports-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "tags": []
+}

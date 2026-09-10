@@ -64,4 +64,10 @@ tmp/
 *.swo
 *~
 .DS_Store
-Thumbs.db
+
+
+node_modules/
+.venv/
+__pycache__/
+dist/
+.git/

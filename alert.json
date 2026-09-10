@@ -1,0 +1,248 @@
+{
+  "name": "MineSafe Automated Evacuation Alert & Dispatch Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "evacuation-alert",
+        "options": {}
+      },
+      "id": "76826a6b-ea32-41de-92d6-b77701639fe4",
+      "name": "Alert Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        16
+      ],
+      "webhookId": "evacuation-alert-trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/api/v1/evacuation/calculate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ \"affected_node_id\": $json.body?.node_id ?? $json.node_id ?? $json.body?.affected_node_id ?? \"NODE_04\" }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "c2605691-a223-4f99-8659-2f66b5e5ae8e",
+      "name": "Calculate Evacuation Route",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1120,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const data = item.json;\n  const affectedNode = data.affected_node || { id: \"NODE_04\", latitude: 23.2156, longitude: 72.6369 };\n  const safeZone = data.safe_zone_node || { id: \"NODE_12\", latitude: 23.2198, longitude: 72.6412 };\n\n  const subject = `CRITICAL SAFETY ALERT: Node ${affectedNode.id} - Evacuate Immediately`;\n  const body = `ALERT at node ${affectedNode.id} at latitude ${affectedNode.latitude} and longitude ${affectedNode.longitude}. If you are present nearby, evacuate immediately to Safe Zone ${safeZone.id} at latitude ${safeZone.latitude} and longitude ${safeZone.longitude}.`;\n\n  return {\n    json: {\n      ...data,\n      affected_node: affectedNode,\n      safe_zone_node: safeZone,\n      alert_subject: subject,\n      alert_body: body,\n      evacuation_instruction: data.evacuation_instruction || body\n    }\n  };\n});"
+      },
+      "id": "b5be3c0f-6ca4-4ac8-9464-b0cc67f37527",
+      "name": "Message Formatter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "filePath": "/data/data/miners.xlsx"
+      },
+      "id": "422df66a-e13c-4b60-93e9-ac28680ed7f8",
+      "name": "Read Recipient Workbook",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "dad5f5a9-a07b-4698-abb6-ee2a254c8c85",
+      "name": "Spreadsheet Extractor",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "5d49f5b7-7cb6-4b99-b225-c9405b5bb1fd",
+      "name": "Combine Alert & Personnel Contacts",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "=24bcscs003@student.rru.ac.in",
+        "toEmail": "={{ $json.Email ?? $json.email ?? 'supervisor@mine.com' }}",
+        "subject": "={{ $('Message Formatter').item.json.alert_subject }}",
+        "html": "==<div style=\"font-family: Arial, sans-serif; padding: 20px; border: 2px solid #e53e3e; border-radius: 8px; background-colour: #fff5f5; colour: #2d3748;\">\n  <h2 style=\"colour: #c53030; margin-top: 0; border-bottom: 2px solid #feb2b2; padding-bottom: 8px; text-transform: uppercase;\">\n    ⚠️ Critical Safety Evacuation Notice\n  </h2>\n  \n  <p style=\"font-size: 1.1em; colour: #1a202c; font-weight: bold; line-height: 1.6; background-colour: #fed7d7; padding: 12px; border-radius: 6px; border-left: 4px solid #e53e3e;\">\n    {{ $('Message Formatter').item.json.evacuation_instruction }}\n  </p>\n  \n  <hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 18px 0;\" />\n  \n  <h3 style=\"colour: #2b6cb0; margin-top: 0; font-size: 1em;\">Telemetry & Location Details:</h3>\n  <ul style=\"list-style-type: none; padding-left: 0; line-height: 1.8;\">\n    <li><strong>Affected Node ID:</strong> <span style=\"colour: #c53030; font-weight: bold;\">{{ $('Message Formatter').item.json.affected_node.id }}</span></li>\n    <li><strong>Alert Type:</strong> {{ $('Message Formatter').item.json.affected_node.alert_type }}</li>\n    <li><strong>Source Coordinates:</strong> Lat <code>{{ $('Message Formatter').item.json.affected_node.latitude }}</code>, Lon <code>{{ $('Message Formatter').item.json.affected_node.longitude }}</code></li>\n    <li><strong>Target Safe Zone Node:</strong> <span style=\"colour: #2f855a; font-weight: bold;\">{{ $('Message Formatter').item.json.safe_zone_node.id }}</span></li>\n    <li><strong>Safe Zone Status:</strong> {{ $('Message Formatter').item.json.safe_zone_node.health_status }}</li>\n    <li><strong>Calculated Distance:</strong> {{ $('Message Formatter').item.json.safe_zone_node.distance_meters }} meters</li>\n  </ul>\n  \n  <p style=\"font-size: 0.85em; colour: #718096; margin-top: 20px;\">\n    This is an automated real-time alert dispatched by the MineSafe AI Geotechnical Surveillance System.\n  </p>\n</div>",
+        "options": {}
+      },
+      "id": "09556d22-2656-4cb0-8259-f6f232bb90ca",
+      "name": "Send Emergency Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        -96
+      ],
+      "webhookId": "47e2d37b-6cc7-4516-8269-ddbe556a61e3",
+      "credentials": {
+        "smtp": {
+          "id": "9eOzh18ltEOzcamM",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Alert Webhook Trigger": [
+      {
+        "json": {
+          "headers": {
+            "content-type": "application/json",
+            "user-agent": "PostmanRuntime/7.54.0",
+            "accept": "*/*",
+            "postman-token": "d5b3daec-616f-497d-83a5-02b4330efab9",
+            "host": "localhost:5678",
+            "accept-encoding": "gzip, deflate, br",
+            "connection": "keep-alive",
+            "content-length": "66"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "node_id": "NODE_04",
+            "alert_type": "HIGH_TILT_WARNING"
+          },
+          "webhookUrl": "http://localhost:5678/webhook-test/evacuation-alert",
+          "executionMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Alert Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Calculate Evacuation Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Evacuation Route": {
+      "main": [
+        [
+          {
+            "node": "Message Formatter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message Formatter": {
+      "main": [
+        [
+          {
+            "node": "Combine Alert & Personnel Contacts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Recipient Workbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Recipient Workbook": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spreadsheet Extractor": {
+      "main": [
+        [
+          {
+            "node": "Combine Alert & Personnel Contacts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Alert & Personnel Contacts": {
+      "main": [
+        [
+          {
+            "node": "Send Emergency Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "545f769f-5e5b-44b0-8a9c-2d31463ec049",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a3aaa98d549eb1bf9e7a48128d8c58df6b97c28821ca9876dadb572e90497290"
+  },
+  "nodeGroups": [],
+  "id": "fEsAIVOwGFTg7egV",
+  "tags": []
+}

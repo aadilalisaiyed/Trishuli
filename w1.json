@@ -1,0 +1,160 @@
+{
+    "name": "Daily 3:00 PM Role-Based Report Delivery",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 15 * * *"
+                        }
+                    ]
+                }
+            },
+            "id": "1",
+            "name": "Schedule Trigger (3 PM IST)",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "filePath": "/data/mails.xlsx"
+            },
+            "id": "2",
+            "name": "Read Mails Excel File",
+            "type": "n8n-nodes-base.readBinaryFile",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "3",
+            "name": "Extract Spreadsheet Data",
+            "type": "n8n-nodes-base.spreadsheetFile",
+            "typeVersion": 2,
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const role = (item.json.Roles || item.json.Role || '').toLowerCase().trim();\n  let sections = [];\n  \n  if (role.includes('safety') || role.includes('dgms')) {\n    sections = ['executive-summary', 'risk-overview', 'affected-zones', 'sensor-statistics', 'major-alerts', 'ai-predictions', 'node-health', 'trend-analysis', 'recommended-actions'];\n  } else if (role.includes('geotech')) {\n    sections = ['executive-summary', 'risk-overview', 'sensor-statistics', 'ai-predictions', 'trend-analysis'];\n  } else if (role.includes('manager')) {\n    sections = ['executive-summary', 'risk-overview', 'affected-zones', 'major-alerts', 'recommended-actions'];\n  } else {\n    sections = ['executive-summary', 'risk-overview', 'major-alerts'];\n  }\n  \n  return {\n    json: {\n      email: item.json.Email,\n      phone: item.json['Phone No'] || item.json.Phone,\n      role: item.json.Roles,\n      sections: sections\n    }\n  };\n});"
+            },
+            "id": "4",
+            "name": "Role-to-Section Mapper",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                850,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://host.docker.internal:8000/api/v1/reports/generate",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"sections\": {{ JSON.stringify($json.sections) }}\n}",
+                "options": {}
+            },
+            "id": "5",
+            "name": "Fetch Custom Report JSON",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1050,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://host.docker.internal:8000/api/v1/reports/export/csv",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"sections\": {{ JSON.stringify($json.sections) }}\n}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "neverError": true,
+                            "responseFormat": "file"
+                        }
+                    }
+                }
+            },
+            "id": "6",
+            "name": "Fetch CSV Attachment",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1050,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule Trigger (3 PM IST)": {
+            "main": [
+                [
+                    {
+                        "node": "Read Mails Excel File",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Read Mails Excel File": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Spreadsheet Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Spreadsheet Data": {
+            "main": [
+                [
+                    {
+                        "node": "Role-to-Section Mapper",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Role-to-Section Mapper": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Custom Report JSON",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Fetch CSV Attachment",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
