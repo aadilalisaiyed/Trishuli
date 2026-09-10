@@ -38,6 +38,11 @@ function useDarkMode(): [boolean, () => void] {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem('khanraksh_theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 

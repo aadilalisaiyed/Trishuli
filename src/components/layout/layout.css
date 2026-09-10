@@ -19,7 +19,7 @@
   padding: 0 var(--sp-lg);
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 2000;
   box-shadow: var(--shadow-sm);
 }
 
