@@ -26,6 +26,7 @@ from app.schemas.node import (
 )
 from app.schemas.alert import AlertOut
 from app.services.ai import calculate_risk_metrics, build_ai_risk_assessment, evaluate_thresholds
+from app.services.evacuation import calculate_optimal_evacuation_target, dispatch_n8n_evacuation_alert
 
 router = APIRouter(prefix="/nodes", tags=["Nodes & Telemetry"])
 
@@ -239,7 +240,7 @@ async def ingest_sensor_reading(
         }
         await manager.broadcast_to_mine(node.mine_id, tick_payload)
 
-        # If a new alert was generated, broadcast NEW_ALERT
+        # If a new alert was generated, broadcast NEW_ALERT & dispatch to n8n
         if created_alert:
             db.refresh(created_alert)
             alert_out = AlertOut.model_validate(created_alert).model_dump(mode="json")
@@ -248,6 +249,9 @@ async def ingest_sensor_reading(
                 "payload": {"alert": alert_out},
             }
             await manager.broadcast_to_mine(node.mine_id, alert_payload)
+
+            evac_result = calculate_optimal_evacuation_target(node_id, db)
+            dispatch_n8n_evacuation_alert(evac_result)
 
     except Exception as ws_err:
         print(f"[WebSocket Broadcast Warning] Failed to broadcast telemetry update: {ws_err}")

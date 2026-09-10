@@ -41,6 +41,8 @@ def generate_report(
     """
     start_dt = config.date_range.start
     end_dt = config.date_range.end
+    selected_sections = config.enabled_section_ids
+    has_section_selection = bool(config.sections)
 
     # Query nodes in scope
     node_query = db.query(Node)
@@ -64,16 +66,18 @@ def generate_report(
     )
 
     # Query alerts within scope
-    alerts = (
-        db.query(Alert)
-        .filter(
-            Alert.node_id.in_(node_ids),
-            Alert.timestamp >= start_dt,
-            Alert.timestamp <= end_dt,
+    alerts = []
+    if not has_section_selection or "major-alerts" in selected_sections:
+        alerts = (
+            db.query(Alert)
+            .filter(
+                Alert.node_id.in_(node_ids),
+                Alert.timestamp >= start_dt,
+                Alert.timestamp <= end_dt,
+            )
+            .order_by(desc(Alert.timestamp))
+            .all()
         )
-        .order_by(desc(Alert.timestamp))
-        .all()
-    )
 
     # Calculate Risk Overview
     total_r = len(readings)
@@ -120,21 +124,23 @@ def generate_report(
                 0.0, 0.0, 0.0, 0, 0.0, 95.0, 0.0
             )
 
-        node_stats.append(NodeStatistic(
-            node_id=nid,
-            avg_tilt=avg_tilt,
-            max_displacement=max_disp,
-            peak_vibration=peak_vib,
-            crack_events=cracks,
-            avg_risk_score=avg_score,
-        ))
+        if not has_section_selection or {"sensor-statistics", "node-health"} & selected_sections:
+            node_stats.append(NodeStatistic(
+                node_id=nid,
+                avg_tilt=avg_tilt,
+                max_displacement=max_disp,
+                peak_vibration=peak_vib,
+                crack_events=cracks,
+                avg_risk_score=avg_score,
+            ))
 
-        ai_preds.append(AIPredictionStat(
-            node_id=nid,
-            avg_prediction_accuracy=avg_acc,
-            avg_confidence=avg_acc,
-            predicted_deformation=latest_pred,
-        ))
+        if not has_section_selection or "ai-predictions" in selected_sections:
+            ai_preds.append(AIPredictionStat(
+                node_id=nid,
+                avg_prediction_accuracy=avg_acc,
+                avg_confidence=avg_acc,
+                predicted_deformation=latest_pred,
+            ))
 
     summary_text = (
         f"Geotechnical safety report generated for {config.mine}. "
@@ -165,6 +171,7 @@ def export_csv(
     """
     start_dt = config.date_range.start
     end_dt = config.date_range.end
+    _ = config.enabled_section_ids
 
     node_query = db.query(Node)
     if "ALL" not in config.node_scope and len(config.node_scope) > 0:
